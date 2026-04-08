@@ -3,10 +3,10 @@ name: python-Linux
 on:
   push:
     branches:
-    - main
+    - fbthrift-python-ci
   pull_request:
     branches:
-    - main
+    - fbthrift-python-ci
 
 permissions:
   contents: read  #  to fetch code (actions/checkout)

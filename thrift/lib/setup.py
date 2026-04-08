@@ -299,6 +299,11 @@ else:
             **common_options,
         ),
         Extension(
+            "thrift.python.streaming.closeable",
+            sources=["thrift/python/streaming/closeable.pyx"],
+            **common_options,
+        ),
+        Extension(
             "thrift.python.streaming.py_promise",
             sources=["thrift/python/streaming/py_promise.pyx"],
             **common_options,
@@ -526,7 +531,7 @@ else:
         "thrift.python.conformance",
         "thrift.python.server_impl",
         "thrift.python.server_impl.interceptor",
-        # "thrift.python.streaming",  # DISABLED FOR NOW
+        "thrift.python.streaming",
         "thrift.py3",
         "thrift.lib",
         "thrift.lib.python",
@@ -544,7 +549,7 @@ else:
         name="thrift",
         version="0.0.1",
         packages=packages,
-        package_data={"": ["*.pxd", "*.h", "*.so"]},
+        package_data={"": ["*.pxd", "*.h", "*.so", "*.pyi"]},
         setup_requires=["cython"],
         zip_safe=False,
         ext_modules=cythonize(

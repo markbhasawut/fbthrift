@@ -67,6 +67,9 @@ jobs:
     - name: Fetch googletest
       if: ${{ steps.paths.outputs.googletest_SOURCE }}
       run: python3 build/fbcode_builder/getdeps.py --allow-system-packages fetch --no-tests googletest
+    - name: Fetch benchmark
+      if: ${{ steps.paths.outputs.benchmark_SOURCE }}
+      run: python3 build/fbcode_builder/getdeps.py --allow-system-packages fetch --no-tests benchmark
     - name: Fetch libaio
       if: ${{ steps.paths.outputs.libaio_SOURCE }}
       run: python3 build/fbcode_builder/getdeps.py --allow-system-packages fetch --no-tests libaio
@@ -313,6 +316,22 @@ jobs:
       with:
        path: ${{ steps.paths.outputs.googletest_INSTALL }}
        key: ${{ steps.paths.outputs.googletest_CACHE_KEY }}-install
+    - name: Restore benchmark from cache
+      id: restore_benchmark
+      if: ${{ steps.paths.outputs.benchmark_SOURCE }}
+      uses: actions/cache/restore@v4
+      with:
+       path: ${{ steps.paths.outputs.benchmark_INSTALL }}
+       key: ${{ steps.paths.outputs.benchmark_CACHE_KEY }}-install
+    - name: Build benchmark
+      if: ${{ steps.paths.outputs.benchmark_SOURCE && ! steps.restore_benchmark.outputs.cache-hit }}
+      run: python3 build/fbcode_builder/getdeps.py --allow-system-packages build --free-up-disk --no-tests benchmark
+    - name: Save benchmark to cache
+      uses: actions/cache/save@v4
+      if: ${{ steps.paths.outputs.benchmark_SOURCE && ! steps.restore_benchmark.outputs.cache-hit }}
+      with:
+       path: ${{ steps.paths.outputs.benchmark_INSTALL }}
+       key: ${{ steps.paths.outputs.benchmark_CACHE_KEY }}-install
     - name: Restore libaio from cache
       id: restore_libaio
       if: ${{ steps.paths.outputs.libaio_SOURCE }}

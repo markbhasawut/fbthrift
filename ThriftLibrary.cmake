@@ -270,7 +270,7 @@ macro(thrift_generate
       ${output_path}/gen-${language}/${service}_custom_protocol.h
     )
     set("${target_file_name}-${language}-SOURCES"
-      ${${source_file_name}-${language}-SOURCES}
+      ${${source_file_name}-${language}-HEADERS}
       ${output_path}/gen-${language}/${service}.cpp
       ${output_path}/gen-${language}/${service}AsyncClient.cpp
     )

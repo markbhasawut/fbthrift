@@ -174,17 +174,20 @@ else:
         extra_link_args.extend(shlex.split(ldflags_str))
 
     # RPATH for runtime library resolution
-    # Use $ORIGIN so auditwheel can properly bundle libraries into the wheel.
-    # $ORIGIN/.libs is where auditwheel places bundled shared libraries.
-    # We also add $ORIGIN for libraries in the same directory as the extension.
-    extra_link_args.append("-Wl,-rpath,$ORIGIN/.libs")
-    extra_link_args.append("-Wl,-rpath,$ORIGIN")
+    # Use @loader_path (macOS) or $ORIGIN (Linux) so delocate/auditwheel can properly bundle libraries into the wheel.
+    if sys.platform == "darwin":
+        extra_link_args.append("-Wl,-rpath,@loader_path/.libs")
+        extra_link_args.append("-Wl,-rpath,@loader_path")
+    else:
+        extra_link_args.append("-Wl,-rpath,$ORIGIN/.libs")
+        extra_link_args.append("-Wl,-rpath,$ORIGIN")
 
     common_options = {
         "language": "c++",
         "include_dirs": include_dirs,
         "library_dirs": lib_search_paths,  # Tell linker where to find dynamic libraries
         "libraries": dynamic_libs + [python_lib],
+        "define_macros": [("THRIFT_HAS_JSON5_PROTOCOL", "1")],
         "extra_compile_args": ["-std=c++20", "-fcoroutines"],
         "extra_link_args": extra_link_args,
     }
@@ -578,7 +581,7 @@ else:
         name="thrift",
         version="0.0.1",
         packages=packages,
-        package_data={"": ["*.pxd", "*.h", "*.so"]},
+        package_data={"": ["*.pyi", "*.pxd", "*.pyx", "*.h", "*.so", "*.dylib", "py.typed"]},
         setup_requires=["cython"],
         zip_safe=False,
         ext_modules=cythonize(

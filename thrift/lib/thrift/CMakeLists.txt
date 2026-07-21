@@ -221,7 +221,91 @@ thrift_generate(
   THRIFT_INCLUDE_DIRECTORIES ${THRIFT_SOURCE_DIR}
 )
 
+thrift_generate(
+  "any" #file_name
+  "" #services
+  "cpp2" #language
+  "json,no_metadata" #options
+  "${CMAKE_CURRENT_SOURCE_DIR}" #file_path
+  "${CMAKE_CURRENT_BINARY_DIR}" #output_path
+  "thrift/lib/thrift" #include_prefix
+  THRIFT_INCLUDE_DIRECTORIES ${THRIFT_SOURCE_DIR}
+)
+
+thrift_generate(
+  "any_patch" #file_name
+  "" #services
+  "cpp2" #language
+  "json,no_metadata" #options
+  "${CMAKE_CURRENT_SOURCE_DIR}" #file_path
+  "${CMAKE_CURRENT_BINARY_DIR}" #output_path
+  "thrift/lib/thrift" #include_prefix
+  THRIFT_INCLUDE_DIRECTORIES ${THRIFT_SOURCE_DIR}
+)
+
+thrift_generate(
+  "any_patch_detail" #file_name
+  "" #services
+  "cpp2" #language
+  "json,no_metadata" #options
+  "${CMAKE_CURRENT_SOURCE_DIR}" #file_path
+  "${CMAKE_CURRENT_BINARY_DIR}" #output_path
+  "thrift/lib/thrift" #include_prefix
+  THRIFT_INCLUDE_DIRECTORIES ${THRIFT_SOURCE_DIR}
+)
+
+thrift_generate(
+  "ast" #file_name
+  "" #services
+  "cpp2" #language
+  "no_metadata" #options
+  "${CMAKE_CURRENT_SOURCE_DIR}" #file_path
+  "${CMAKE_CURRENT_BINARY_DIR}" #output_path
+  "thrift/lib/thrift" #include_prefix
+  THRIFT_INCLUDE_DIRECTORIES ${THRIFT_SOURCE_DIR}
+)
+
+thrift_generate(
+  "dynamic" #file_name
+  "" #services
+  "cpp2" #language
+  "json,no_metadata" #options
+  "${CMAKE_CURRENT_SOURCE_DIR}" #file_path
+  "${CMAKE_CURRENT_BINARY_DIR}" #output_path
+  "thrift/lib/thrift" #include_prefix
+  THRIFT_INCLUDE_DIRECTORIES ${THRIFT_SOURCE_DIR}
+)
+
+thrift_generate(
+  "patch" #file_name
+  "" #services
+  "cpp2" #language
+  "no_metadata" #options
+  "${CMAKE_CURRENT_SOURCE_DIR}" #file_path
+  "${CMAKE_CURRENT_BINARY_DIR}" #output_path
+  "thrift/lib/thrift" #include_prefix
+  THRIFT_INCLUDE_DIRECTORIES ${THRIFT_SOURCE_DIR}
+)
+
+thrift_generate(
+  "patch_op" #file_name
+  "" #services
+  "cpp2" #language
+  "no_metadata" #options
+  "${CMAKE_CURRENT_SOURCE_DIR}" #file_path
+  "${CMAKE_CURRENT_BINARY_DIR}" #output_path
+  "thrift/lib/thrift" #include_prefix
+  THRIFT_INCLUDE_DIRECTORIES ${THRIFT_SOURCE_DIR}
+)
+
+set_property(GLOBAL PROPERTY any-cpp2-SOURCES ${any-cpp2-SOURCES})
+set_property(GLOBAL PROPERTY any_patch-cpp2-SOURCES ${any_patch-cpp2-SOURCES})
+set_property(GLOBAL PROPERTY any_patch_detail-cpp2-SOURCES ${any_patch_detail-cpp2-SOURCES})
 set_property(GLOBAL PROPERTY any_rep-cpp2-SOURCES ${any_rep-cpp2-SOURCES})
+set_property(GLOBAL PROPERTY ast-cpp2-SOURCES ${ast-cpp2-SOURCES})
+set_property(GLOBAL PROPERTY dynamic-cpp2-SOURCES ${dynamic-cpp2-SOURCES})
+set_property(GLOBAL PROPERTY patch-cpp2-SOURCES ${patch-cpp2-SOURCES})
+set_property(GLOBAL PROPERTY patch_op-cpp2-SOURCES ${patch_op-cpp2-SOURCES})
 set_property(GLOBAL PROPERTY RpcMetadata-cpp2-SOURCES
   ${RpcMetadata-cpp2-SOURCES})
 set_property(GLOBAL PROPERTY frozen-cpp2-SOURCES ${frozen-cpp2-SOURCES})
@@ -250,3 +334,16 @@ set_property(GLOBAL PROPERTY protocol_detail-cpp2-SOURCES
   ${protocol_detail-cpp2-SOURCES})
 set_property(GLOBAL PROPERTY field_mask-cpp2-SOURCES
   ${field_mask-cpp2-SOURCES})
+
+# Install includes
+file(GLOB THRIFT_LIB_THRIFT_ROOT_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
+install(
+  FILES ${THRIFT_LIB_THRIFT_ROOT_HEADERS}
+  DESTINATION ${INCLUDE_INSTALL_DIR}/thrift/lib/thrift
+)
+
+install(
+  DIRECTORY detail
+  DESTINATION ${INCLUDE_INSTALL_DIR}/thrift/lib/thrift
+  FILES_MATCHING PATTERN "*.h" PATTERN "*.tcc"
+)

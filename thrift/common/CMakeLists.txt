@@ -33,3 +33,20 @@ target_link_libraries(
   Boost::boost
   fmt::fmt
 )
+
+if (enable_tests)
+  include(GoogleTest)
+  foreach (test_name tree_printer_test universal_name_test)
+    add_executable(Common_${test_name}
+      test/${test_name}.cc
+    )
+    target_link_libraries(Common_${test_name}
+      PUBLIC
+        GTest::gtest_main
+        common
+        Folly::folly
+        fmt::fmt
+    )
+    gtest_discover_tests(Common_${test_name})
+  endforeach ()
+endif ()

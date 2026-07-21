@@ -20,7 +20,13 @@ endif ()
 
 if (THRIFT_LIB_ONLY OR build_all)
   add_subdirectory(annotation)
+  add_subdirectory(conformance)
   add_subdirectory(lib)
+endif ()
+
+if (enable_tests OR build_all)
+  add_subdirectory(perf)
+  add_subdirectory(test)
 endif ()
 
 # Install CMake package configuration files for Thrift.

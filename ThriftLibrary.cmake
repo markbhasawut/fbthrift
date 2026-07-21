@@ -263,14 +263,14 @@ macro(thrift_generate
   endif()
   foreach(service ${services})
     set("${target_file_name}-${language}-HEADERS"
-      ${${source_file_name}-${language}-HEADERS}
+      ${${target_file_name}-${language}-HEADERS}
       ${output_path}/gen-${language}/${service}.h
       ${output_path}/gen-${language}/${service}.tcc
       ${output_path}/gen-${language}/${service}AsyncClient.h
       ${output_path}/gen-${language}/${service}_custom_protocol.h
     )
     set("${target_file_name}-${language}-SOURCES"
-      ${${source_file_name}-${language}-SOURCES}
+      ${${target_file_name}-${language}-SOURCES}
       ${output_path}/gen-${language}/${service}.cpp
       ${output_path}/gen-${language}/${service}AsyncClient.cpp
     )
@@ -359,7 +359,7 @@ macro(thrift_generate
     )
     add_custom_target(
       ${target_file_name}-${language}-target ALL
-      DEPENDS ${${language}-${language}-HEADERS}
+      DEPENDS ${${target_file_name}-${language}-HEADERS}
         ${${target_file_name}-${language}-SOURCES}
     )
     install(

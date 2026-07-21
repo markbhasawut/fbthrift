@@ -13,7 +13,10 @@
 # limitations under the License.
 
 if (enable_tests)
+  add_subdirectory(concurrency/test)
+  add_subdirectory(transport/test)
   add_subdirectory(util/test)
+  add_subdirectory(test)
 endif ()
 
 add_library(
@@ -39,6 +42,7 @@ add_library(
 
   concurrency/InitThreadFactory.cpp
   concurrency/PosixThreadFactory.cpp
+  concurrency/SFQThreadManager.cpp
   concurrency/ThreadManager.cpp
 )
 target_link_libraries(
@@ -159,12 +163,20 @@ if (THRIFT_RPC)
   )
 endif () # THRIFT_RPC
 
+# Install includes
+file(GLOB THRIFT1_ROOT_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
+install(
+  FILES ${THRIFT1_ROOT_HEADERS}
+  DESTINATION ${INCLUDE_INSTALL_DIR}/thrift/lib/cpp
+)
+
 set(THRIFT1_HEADER_DIRS
   async
   concurrency
   protocol
   server
   transport
+  util
 )
 foreach(dir ${THRIFT1_HEADER_DIRS})
   install(DIRECTORY ${dir} DESTINATION ${INCLUDE_INSTALL_DIR}/thrift/lib/cpp

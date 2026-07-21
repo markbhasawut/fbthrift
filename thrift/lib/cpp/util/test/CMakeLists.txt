@@ -32,6 +32,8 @@ if (THRIFT_BENCHMARKS)
 endif ()
 
 set(PROTOCOL_TESTS
+   SaturatingMatchTest
+   THttpParserTest
    VarintUtilsTest)
 
 # Build each test independently.

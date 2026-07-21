@@ -21,6 +21,19 @@ endif ()
 
 if (enable_tests)
   add_subdirectory(protocol/test)
+  add_subdirectory(transcode/test)
+  add_subdirectory(fast_thrift/test)
+  add_subdirectory(server/test)
+  add_subdirectory(util/test)
+  add_subdirectory(debug_thrift_data_difference/test)
+  add_subdirectory(detail/test)
+  add_subdirectory(dynamic/test)
+  add_subdirectory(folly_dynamic/test)
+  add_subdirectory(frozen/test)
+  add_subdirectory(logging/tests)
+  add_subdirectory(patch/test)
+  add_subdirectory(runtime/test)
+  add_subdirectory(security/test)
   add_subdirectory(test)
 endif ()
 
@@ -80,12 +93,14 @@ add_library(
   dynamic/TypeId.cpp
   dynamic/TypeSystem.cpp
   dynamic/TypeSystemBuilder.cpp
+  dynamic/AccumulatingTypeSystem.cpp
   dynamic/TypeSystemDigest.cpp
   dynamic/TypeSystemTraits.cpp
   runtime/BaseSchemaRegistry.cpp
   runtime/Init.cpp
   schema/detail/Merge.cpp
   ../thrift/detail/protocol.cpp
+  ../thrift/detail/MetadataAdapter.cpp
   ../thrift/detail/TypeIdAdapter.cpp
   ../thrift/detail/TypeSystemAdapter.cpp
 
@@ -177,6 +192,8 @@ add_library(
   # Putting them in thriftmetadata would cycle with thrift_dynamic_value.
   dynamic/AnnotationValue.cpp
   dynamic/ServiceDescriptor.cpp
+  dynamic/ServiceDescriptorBuilder.cpp
+  dynamic/SyntaxGraphServiceDescriptor.cpp
   schema/detail/SchemaBackedResolver.cpp
   schema/SyntaxGraph.cpp
   runtime/SchemaRegistry.cpp
@@ -244,7 +261,13 @@ add_library(
   ${type-cpp2-SOURCES}
 
   op/Serializer.cpp
+  op/StdSerializer.cpp
+  op/detail/AnyPatch.cpp
+  patch/detail/TaggedPatch.cpp
+  ../thrift/detail/AnyPatch.cpp
+  ../thrift/detail/DynamicPatch.cpp
   type/Any.cpp
+  type/AnyDebugWriter.cpp
   type/BaseType.cpp
   type/Protocol.cpp
   type/Runtime.cpp
@@ -308,24 +331,66 @@ add_library(
   protocol/CompactProtocol.cpp
   protocol/CompactV1Protocol.cpp
   protocol/DebugProtocol.cpp
+  protocol/FieldMask.cpp
+  protocol/FieldMaskRef.cpp
   protocol/JSONProtocol.cpp
   protocol/JSONProtocolCommon.cpp
+  protocol/LazyDeserializationFlags.cpp
+  protocol/NativeObject.cpp
+  protocol/Object.cpp
+  protocol/Patch.cpp
   protocol/Serializer.cpp
   protocol/TableBasedSerializer.cpp
   protocol/TableBasedSerializerImpl.cpp
   protocol/VirtualProtocol.cpp
+
+  protocol/detail/CompoundTypeTracker.cpp
+  protocol/detail/FieldMask.cpp
+  protocol/detail/FieldMaskUtil.cpp
+  protocol/detail/Json5ProtocolReader.cpp
+  protocol/detail/Json5ProtocolWriter.cpp
+  protocol/detail/JsonReader.cpp
+  protocol/detail/JsonUtils.cpp
+  protocol/detail/JsonWriter.cpp
+  protocol/detail/Object.cpp
+  protocol/detail/index.cpp
 
   ../cpp/protocol/TBase64Utils.cpp
   ../cpp/protocol/TProtocolException.cpp
   ../cpp/protocol/TType.cpp
   ../cpp/util/VarintUtils.cpp
 )
+target_compile_definitions(thriftprotocol PUBLIC THRIFT_HAS_JSON5_PROTOCOL)
 target_link_libraries(
   thriftprotocol
   PUBLIC
     fmt::fmt
     Folly::folly
     ${GLOG_LIBRARIES}
+    thrift-core
+)
+
+add_library(
+  thrifttranscode
+
+  transcode/BinaryIntrinsics.cpp
+  transcode/CodecFactory.cpp
+  transcode/CompactIntrinsics.cpp
+  transcode/Cursor.cpp
+  transcode/IntrinsicsCommon.cpp
+  transcode/JsonIntrinsics.cpp
+  transcode/ProtobufIntrinsics.cpp
+  transcode/TranscodeErrc.cpp
+  transcode/TranscodeInterpreter.cpp
+  transcode/TranscodePlan.cpp
+  transcode/Transcoder.cpp
+)
+target_link_libraries(
+  thrifttranscode
+  PUBLIC
+    fmt::fmt
+    Folly::folly
+    thriftprotocol
     thrift-core
 )
 
@@ -344,12 +409,15 @@ add_library(
   async/AsyncProcessorFactory.cpp
   async/AsyncProcessorHelper.cpp
   async/ClientChannel.cpp
+  async/ClientInterceptorBase.cpp
+  async/ClientInterceptorControl.cpp
   async/ClientSinkBridge.cpp
   async/ClientStreamBridge.cpp
   async/ClientStreamInterceptorContext.cpp
   async/Cpp2Channel.cpp
   async/DuplexChannel.cpp
   async/FramingHandler.cpp
+  async/HTTPClientChannel.cpp
   async/HeaderChannel.cpp
   async/HeaderChannelTrait.cpp
   async/HeaderClientChannel.cpp
@@ -358,8 +426,10 @@ add_library(
   async/Interaction.cpp
   async/InteractionOverloadPolicy.cpp
   async/InterceptorFlags.cpp
+  async/InterceptorFrameworkMetadata.cpp
   async/MultiplexAsyncProcessor.cpp
   async/PooledRequestChannel.cpp
+  async/PreprocessingAsyncProcessorWrapper.cpp
   async/ReconnectingRequestChannel.cpp
   async/RequestCallback.cpp
   async/RequestChannel.cpp
@@ -394,13 +464,26 @@ add_library(
   gen/module_constants_cpp.cpp
   gen/module_types_cpp.cpp
   detail/Enum.cpp
+  detail/EventHandlerRuntime.cpp
   fast_thrift/channel_pipeline/PipelineImpl.cpp
   fast_thrift/channel_pipeline/detail/ContextImpl.cpp
+  fast_thrift/connection/ConnectionHandler.cpp
+  fast_thrift/connection/ConnectionManager.cpp
+  fast_thrift/connection/endpoint/ConnectionListener.cpp
+  fast_thrift/connection/security/util/StopTLSHelper.cpp
   fast_thrift/frame/write/FrameWriter.cpp
+  fast_thrift/security/FizzHandshakeHelper.cpp
+  fast_thrift/security/FizzServerContextBuilder.cpp
+  fast_thrift/security/TLSPrefixPeeker.cpp
   fast_thrift/thrift/FastThriftAdapterBase.cpp
+  fast_thrift/thrift/client/ThriftClientAppAdapter.cpp
   fast_thrift/thrift/client/ThriftClientChannel.cpp
   fast_thrift/thrift/client/util/RocketFrameDecoder.cpp
+  fast_thrift/thrift/server/FastThriftChannelServer.cpp
+  fast_thrift/thrift/server/FastThriftServer.cpp
+  fast_thrift/thrift/server/FastThriftServerRegistry.cpp
   fast_thrift/thrift/server/ThriftServerChannel.cpp
+  fast_thrift/thrift/server/ThriftServerConnectionFactory.cpp
   fast_thrift/transport/TransportHandler.cpp
   logging/ThriftBiDiLog.cpp
   logging/ThriftConnectionLog.cpp
@@ -420,6 +503,7 @@ add_library(
   server/CPUConcurrencyController.cpp
   server/DecoratorData.cpp
   server/DecoratorDataRuntime.cpp
+  server/IOUringUtil.cpp
   server/LazyDynamicArguments.cpp
   server/LegacyHeaderRoutingHandler.cpp
   server/LoggingEvent.cpp
@@ -439,6 +523,7 @@ add_library(
   server/ResourcePool.cpp
   server/ResourcePoolSet.cpp
   server/ResourcePoolHandle.cpp
+  server/ResourcePoolMigrationHelper.cpp
   server/RoundRobinRequestPile.cpp
   server/WeightedRequestPileQueue.cpp
   server/ServerAttribute.cpp
@@ -449,7 +534,6 @@ add_library(
   server/ServiceInterceptorControl.cpp
   server/ServiceInterceptorOnDrop.cpp
   server/ServiceInterceptorOnReceived.cpp
-  server/ServiceInterceptorQualifiedName.cpp
   server/ThriftCatalogServerInterface.cpp
   server/ThriftProcessor.cpp
   server/ThriftServer.cpp
@@ -457,6 +541,9 @@ add_library(
   server/TMConcurrencyController.cpp
   server/peeking/TLSHelper.cpp
   server/metrics/PendingConnectionsMetrics.cpp
+  server/overload/CurrentlyOverloadedChecker.cpp
+  server/overload/QpsOverloadChecker.cpp
+  server/overload/QueueConcurrencyOverloadChecker.cpp
   transport/core/RequestStateMachine.cpp
   transport/core/RpcMetadataUtil.cpp
   transport/core/RpcMetadataPlugins.cpp
@@ -464,6 +551,14 @@ add_library(
   transport/core/ThriftClient.cpp
   transport/core/ThriftClientCallback.cpp
   transport/core/ThriftRequest.cpp
+  transport/http2/client/H2ClientConnection.cpp
+  transport/http2/client/ThriftTransactionHandler.cpp
+  transport/http2/common/H2Channel.cpp
+  transport/http2/common/HTTP2RoutingHandler.cpp
+  transport/http2/common/SingleRpcChannel.cpp
+  transport/http2/server/ThriftRequestHandler.cpp
+  transport/util/ConnectionManager.cpp
+  transport/util/ConnectionThread.cpp
   transport/rocket/FdSocket.cpp
   transport/rocket/ChecksumGenerator.cpp
   transport/rocket/Types.cpp
@@ -514,6 +609,7 @@ add_library(
   transport/rocket/server/detail/WriteBatcher.cpp
   util/Checksum.cpp
   util/DebugString.cpp
+  util/DebugTree.cpp
   util/EmptyAsyncProcessor.cpp
   util/SchemaToMetadata.cpp
   util/ScopedServerInterfaceThread.cpp
@@ -548,6 +644,7 @@ target_link_libraries(
     thrift_dynamic_value
     thriftfrozen2
     thriftprotocol
+    thrifttranscode
     thrifttyperep
     thrifttype
     thriftanyrep
@@ -575,15 +672,51 @@ target_link_libraries(
 )
 endif () # THRIFT_RPC
 
+if (NOT THRIFT_LIB_ONLY)
+  add_executable(
+    SimpleJSONProtocolSkip
+
+    protocol/tool/SimpleJSONProtocolSkip.cpp
+  )
+  target_link_libraries(
+    SimpleJSONProtocolSkip
+    PRIVATE
+      thriftprotocol
+      thriftcpp2
+      Folly::folly
+      Boost::program_options
+      Boost::boost
+  )
+endif ()
+
 # Install includes
+file(GLOB THRIFT2_ROOT_HEADERS "${CMAKE_CURRENT_SOURCE_DIR}/*.h")
+install(
+  FILES ${THRIFT2_ROOT_HEADERS}
+  DESTINATION ${INCLUDE_INSTALL_DIR}/thrift/lib/cpp2
+)
+
 set(THRIFT2_HEADER_DIRS
   async
+  debug_thrift_data_difference
+  detail
+  dynamic
   fast_thrift
+  folly_dynamic
   frozen
+  op
+  patch
   protocol
+  reflection
+  runtime
+  schema
+  security
   server
+  transcode
   transport
+  type
   util
+  visitation
 )
 install(
   DIRECTORY ${THRIFT2_HEADER_DIRS}
@@ -593,7 +726,7 @@ install(
 
 if (BUILD_SHARED_LIBS)
   set_target_properties(rpcmetadata thriftannotation thriftmetadata thrift_path
-    thrift_dynamic_value thriftfrozen2 thriftprotocol thrifttyperep thrifttype
+    thrift_dynamic_value thriftfrozen2 thriftprotocol thrifttranscode thrifttyperep thrifttype
     thriftanyrep serverdbginfo
     PROPERTIES VERSION ${PACKAGE_VERSION}
     )
@@ -615,6 +748,7 @@ install(
     thrifttype
     thriftanyrep
     thriftprotocol
+    thrifttranscode
     serverdbginfo
   EXPORT fbthrift-exports
   DESTINATION ${LIB_INSTALL_DIR}

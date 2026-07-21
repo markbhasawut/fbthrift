@@ -81,6 +81,7 @@ add_library(
   ast/t_typedef.cc
   ast/t_union.cc
   ast/scope_identifier.cc
+  ast/thrift_ast_debug_tree_utils.cc
 )
 target_link_libraries(
   compiler_ast
@@ -97,6 +98,7 @@ add_library(
 
   detail/system.cc
   detail/pluggable_functions.cc
+  detail/generate_bundled_thrift.cc
   diagnostic.cc
   source_location.cc
 )
@@ -131,7 +133,6 @@ add_library(
   sema/sema_context.cc
   sema/schematizer.cc
   sema/standard_validator.cc
-  sema/sema_context.cc
   sema/resolution_mismatch.cc
 )
 target_compile_definitions(compiler_lib PRIVATE THRIFT_OSS)
@@ -223,6 +224,37 @@ if (MSVC)
   )
 endif ()
 
+# Create the Thrift Formatter executable binary
+add_executable(
+  thrift-fmt
+  formatter_main.cc
+)
+target_link_libraries(
+  thrift-fmt
+  compiler_ast
+  compiler_base
+  compiler_lib
+  ${FBTHRIFT_COMPILER_LINK_CXXFS}
+)
+
+# Create the Thrift Codemod executable binary
+file(GLOB CODEMOD_SRCS codemod/*.cc)
+add_executable(
+  thrift-codemod
+  ${CODEMOD_SRCS}
+)
+target_link_libraries(
+  thrift-codemod
+  compiler_ast
+  compiler_base
+  compiler_lib
+  ${FBTHRIFT_COMPILER_LINK_CXXFS}
+)
+
+if (enable_tests OR build_all)
+  add_subdirectory(test)
+endif ()
+
 if (BUILD_SHARED_LIBS)
   # All but thrift1 since it's a binary.
   set_target_properties(
@@ -238,6 +270,8 @@ endif ()
 
 install(
   TARGETS thrift1
+    thrift-fmt
+    thrift-codemod
     compiler_ast
     compiler_base
     compiler_lib

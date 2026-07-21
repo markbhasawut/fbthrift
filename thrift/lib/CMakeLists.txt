@@ -38,10 +38,13 @@ if(thriftpy3)
   file(MAKE_DIRECTORY "${_cybld}/thrift/python/server/flagged/")
   file(MAKE_DIRECTORY "${_cybld}/thrift/py3/")
 
-  # So that cython includes work correctly
+  # So that cython includes and PEP 561 LSPs work correctly
   file(TOUCH "${_cybld}/thrift/__init__.pxd")
   file(TOUCH "${_cybld}/thrift/python/__init__.pxd")
   file(TOUCH "${_cybld}/thrift/py3/__init__.pxd")
+  file(TOUCH "${_cybld}/thrift/py.typed")
+  file(TOUCH "${_cybld}/thrift/python/py.typed")
+  file(TOUCH "${_cybld}/thrift/py3/py.typed")
 
   # Run Thrift compiler on metadata.thrift. thrift-python runtime depends on
   # apache.thrift.metadata package, created and installed later in setup.py.

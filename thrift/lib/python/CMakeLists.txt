@@ -151,10 +151,15 @@ foreach(_dir ${_cybld_dirs})
   file(MAKE_DIRECTORY "${_cybld}/${_dir}")
 endforeach()
 
-# So that cython includes work correctly
+# So that cython includes and PEP 561 LSPs work correctly
 file(TOUCH "${_cybld}/thrift/__init__.pxd")
 file(TOUCH "${_cybld}/thrift/python/__init__.pxd")
 file(TOUCH "${_cybld}/thrift/py3/__init__.pxd")
+file(TOUCH "${_cybld}/thrift/py.typed")
+file(TOUCH "${_cybld}/thrift/python/py.typed")
+file(TOUCH "${_cybld}/thrift/py3/py.typed")
+file(MAKE_DIRECTORY "${_cybld}/apache/thrift/metadata")
+file(TOUCH "${_cybld}/apache/thrift/metadata/py.typed")
 
 # Helper function: symlink all source files from a directory to build dir
 # Non-recursive - only files directly in the directory
@@ -619,10 +624,12 @@ add_custom_target(create_binding_symlink_server_impl ALL)
 file(MAKE_DIRECTORY "${_cybld}/thrift/python/server_impl")
 file(MAKE_DIRECTORY "${_cybld}/thrift/python/server_impl/interceptor")
 
-# For cimport during Cython compilation
+# For cimport and import during Cython/Python execution
 file(GLOB ServerImplFiles
   "${CMAKE_CURRENT_SOURCE_DIR}/server/*.pxd"
   "${CMAKE_CURRENT_SOURCE_DIR}/server/*.pyx"
+  "${CMAKE_CURRENT_SOURCE_DIR}/server/*.py"
+  "${CMAKE_CURRENT_SOURCE_DIR}/server/*.pyi"
 )
 
 foreach(_src ${ServerImplFiles})
@@ -646,6 +653,8 @@ endforeach()
 file(GLOB ServerImplInterceptorFiles
   "${CMAKE_CURRENT_SOURCE_DIR}/server/interceptor/*.pxd"
   "${CMAKE_CURRENT_SOURCE_DIR}/server/interceptor/*.pyx"
+  "${CMAKE_CURRENT_SOURCE_DIR}/server/interceptor/*.py"
+  "${CMAKE_CURRENT_SOURCE_DIR}/server/interceptor/*.pyi"
 )
 
 foreach(_src ${ServerImplInterceptorFiles})
@@ -731,18 +740,27 @@ add_custom_command(TARGET thrift_python_and_py3_bindings
   WORKING_DIRECTORY ${_cybld}
 )
 
-# Run auditwheel repair to make the wheel self-contained
-# This bundles .so dependencies and rewrites RPATH to $ORIGIN
-# LD_LIBRARY_PATH tells auditwheel where to find the libraries to bundle
-add_custom_command(TARGET thrift_python_and_py3_bindings
-  COMMAND ${CMAKE_COMMAND} -E make_directory "${_cybld}/dist_self_contained"
-  COMMAND ${CMAKE_COMMAND} -E env
-    "LD_LIBRARY_PATH=${library_dirs_str}"
-    ${Python3_EXECUTABLE} -m auditwheel repair
-    --wheel-dir "${_cybld}/dist_self_contained"
-    "${_cybld}/dist/*.whl"
-  WORKING_DIRECTORY ${_cybld}
-)
+if (APPLE)
+  add_custom_command(TARGET thrift_python_and_py3_bindings
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${_cybld}/dist_self_contained"
+    COMMAND ${CMAKE_COMMAND} -E env
+      "DYLD_LIBRARY_PATH=${library_dirs_str}"
+      ${Python3_EXECUTABLE} -m delocate.cmd.delocate_wheel
+      -w "${_cybld}/dist_self_contained"
+      "${_cybld}/dist/*.whl"
+    WORKING_DIRECTORY ${_cybld}
+  )
+else ()
+  add_custom_command(TARGET thrift_python_and_py3_bindings
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${_cybld}/dist_self_contained"
+    COMMAND ${CMAKE_COMMAND} -E env
+      "LD_LIBRARY_PATH=${library_dirs_str}"
+      ${Python3_EXECUTABLE} -m auditwheel repair
+      --wheel-dir "${_cybld}/dist_self_contained"
+      "${_cybld}/dist/*.whl"
+    WORKING_DIRECTORY ${_cybld}
+  )
+endif ()
 
 # Install the self-contained wheel to the install prefix
 # for users to pip install

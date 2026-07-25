@@ -659,6 +659,11 @@ prototype<t_program>::ptr t_whisker_generator::make_prototype_for_program(
         result.emplace_back(enum_def->uri());
       }
     }
+    for (const auto& service_def : self.services()) {
+      if (!service_def->uri().empty()) {
+        result.emplace_back(service_def->uri());
+      }
+    }
     return array::of(std::move(result));
   });
 

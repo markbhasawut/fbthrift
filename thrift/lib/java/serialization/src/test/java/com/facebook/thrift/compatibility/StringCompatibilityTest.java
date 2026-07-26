@@ -93,9 +93,13 @@ public class StringCompatibilityTest {
   private <T> T fromByteArray(Reader<T> reader, byte[] src, SerializationProtocol protocol) {
     if (offHeap) {
       ByteBuf buf = Unpooled.directBuffer(src.length);
-      buf.writeBytes(src);
-      ByteBufTProtocol byteBufTProtocol = SerializerUtil.toByteBufProtocol(protocol, buf);
-      return reader.read(byteBufTProtocol);
+      try {
+        buf.writeBytes(src);
+        ByteBufTProtocol byteBufTProtocol = SerializerUtil.toByteBufProtocol(protocol, buf);
+        return reader.read(byteBufTProtocol);
+      } finally {
+        buf.release();
+      }
     }
     ByteBufTProtocol byteBufTProtocol =
         SerializerUtil.toByteBufProtocol(protocol, Unpooled.wrappedBuffer(src));

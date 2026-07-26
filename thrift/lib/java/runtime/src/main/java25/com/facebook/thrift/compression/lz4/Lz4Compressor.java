@@ -17,7 +17,7 @@
 package com.facebook.thrift.compression.lz4;
 
 import static com.facebook.thrift.compression.lz4.lz4_h.LZ4_compressBound;
-import static com.facebook.thrift.compression.lz4.lz4_h.LZ4_compress_fast_extState_fastReset;
+import static com.facebook.thrift.compression.lz4.lz4_h.LZ4_compress_fast_extState;
 import static com.facebook.thrift.compression.lz4.lz4_h.LZ4_decompress_safe;
 import static com.facebook.thrift.compression.lz4.lz4_h.LZ4_initStream;
 import static com.facebook.thrift.compression.lz4.lz4_h.LZ4_sizeofState;
@@ -36,11 +36,10 @@ import java.lang.foreign.MemorySegment;
  * Java 25+ LZ4 compressor using the Foreign Function &amp; Memory API to call native liblz4
  * directly via {@link lz4_h}. Replaces the base JNI version via multi-release JAR.
  *
- * <p>Uses {@code LZ4_decompress_safe()} (the safe API) and {@code
- * LZ4_compress_fast_extState_fastReset()} with a thread-local state buffer on Netty event loop
- * threads. State is explicitly initialized via {@code LZ4_initStream()} on first allocation. The
- * fastReset variant avoids re-zeroing the ~16KB hash table on each call, which benefits repeated
- * compression of small (&lt;4KB) payloads. Decompression is stateless.
+ * <p>Uses {@code LZ4_decompress_safe()} (the safe API) and the shared-library-safe {@code
+ * LZ4_compress_fast_extState()} with a thread-local state buffer on Netty event loop threads. State
+ * is explicitly initialized via {@code LZ4_initStream()} on first allocation, while {@code
+ * LZ4_compress_fast_extState()} resets it before each compression. Decompression is stateless.
  */
 public final class Lz4Compressor implements ThriftCompressor {
 
@@ -77,7 +76,7 @@ public final class Lz4Compressor implements ThriftCompressor {
                 .reinterpret(maxCompressedSize);
 
         int compressedSize =
-            LZ4_compress_fast_extState_fastReset(
+            LZ4_compress_fast_extState(
                 state, source, destination, uncompressedSize, maxCompressedSize, 1);
         if (compressedSize <= 0) {
           throw new RuntimeException("LZ4 compression failed: returned " + compressedSize);

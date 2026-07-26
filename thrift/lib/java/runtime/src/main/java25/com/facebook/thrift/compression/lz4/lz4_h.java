@@ -64,11 +64,14 @@ public final class lz4_h {
           LIB.find("LZ4_initStream").orElseThrow(),
           FunctionDescriptor.of(ValueLayout.ADDRESS, ValueLayout.ADDRESS, ValueLayout.JAVA_LONG));
 
-  // int LZ4_compress_fast_extState_fastReset(void* state, const char* src, char* dst,
-  //                                         int srcSize, int dstCapacity, int acceleration)
-  private static final MethodHandle LZ4_compress_fast_extState_fastReset$MH =
+  // int LZ4_compress_fast_extState(void* state, const char* src, char* dst,
+  //                                int srcSize, int dstCapacity, int acceleration)
+  //
+  // Do not bind LZ4_compress_fast_extState_fastReset here: it is declared
+  // LZ4LIB_STATIC_API and is not part of liblz4's shared-library ABI.
+  private static final MethodHandle LZ4_compress_fast_extState$MH =
       LINKER.downcallHandle(
-          LIB.find("LZ4_compress_fast_extState_fastReset").orElseThrow(),
+          LIB.find("LZ4_compress_fast_extState").orElseThrow(),
           FunctionDescriptor.of(
               ValueLayout.JAVA_INT,
               ValueLayout.ADDRESS,
@@ -115,7 +118,7 @@ public final class lz4_h {
     }
   }
 
-  public static int LZ4_compress_fast_extState_fastReset(
+  public static int LZ4_compress_fast_extState(
       MemorySegment state,
       MemorySegment src,
       MemorySegment dst,
@@ -124,7 +127,7 @@ public final class lz4_h {
       int acceleration) {
     try {
       return (int)
-          LZ4_compress_fast_extState_fastReset$MH.invokeExact(
+          LZ4_compress_fast_extState$MH.invokeExact(
               state, src, dst, srcSize, dstCapacity, acceleration);
     } catch (Throwable ex$) {
       throw new AssertionError("should not reach here", ex$);

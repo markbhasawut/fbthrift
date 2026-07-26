@@ -20,7 +20,7 @@ if (APPLE AND NOT DEFINED OPENSSL_ROOT_DIR)
                   OUTPUT_STRIP_TRAILING_WHITESPACE)
 endif ()
 
-set(saved_path ${CMAKE_MODULE_PATH})
-set(CMAKE_MODULE_PATH ${CMAKE_STD_MODULE_PATH})
-find_package(OpenSSL ${ARGN})
-set(CMAKE_MODULE_PATH ${saved_path})
+# Calling find_package(OpenSSL) from this file recurses whenever this directory
+# is on CMAKE_MODULE_PATH. Include CMake's built-in module directly; it consumes
+# the OpenSSL_FIND_* variables established by the original find_package call.
+include("${CMAKE_ROOT}/Modules/FindOpenSSL.cmake")

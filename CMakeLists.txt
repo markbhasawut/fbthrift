@@ -58,10 +58,6 @@ include_directories(${CMAKE_CURRENT_BINARY_DIR})
 set(CMAKE_STD_MODULE_PATH ${CMAKE_MODULE_PATH})
 set(CMAKE_MODULE_PATH
   ${CMAKE_CURRENT_SOURCE_DIR}/thrift/cmake
-  # For in-fbsource builds:
-  ${CMAKE_CURRENT_SOURCE_DIR}/../opensource/fbcode_builder/CMake
-  # For shipit-transformed builds:
-  ${CMAKE_CURRENT_SOURCE_DIR}/build/fbcode_builder/CMake
   ${CMAKE_MODULE_PATH})
 
 # Find required dependencies.
@@ -86,13 +82,29 @@ endif()
 option(THRIFT_COMPILER_ONLY "Build the Thrift compiler only" OFF)
 option(THRIFT_LIB_ONLY "Build the Thrift libraries only" OFF)
 option(THRIFT_RPC "Build the RPC transport stack and its dependencies (fizz, wangle, mvfst). Disable for codegen + (de)serialization-only consumers." ON)
-option(THRIFT_BENCHMARKS "Build benchmark executables (requires google/benchmark). Forced OFF when THRIFT_RPC=OFF because benchmarks link thriftcpp2." ON)
+option(THRIFT_HTTP2 "Build the legacy Proxygen-backed HTTP/2 transport." OFF)
+option(THRIFT_BENCHMARKS "Build the regular benchmark executables. Forced OFF when THRIFT_RPC=OFF because benchmarks link thriftcpp2." OFF)
+option(THRIFT_CARBON_PROTOCOL_BENCHMARK
+  "Build the opt-in Thrift/Carbon/Protobuf protocol benchmark. Requires a mcrouter source checkout and Protobuf."
+  OFF)
+set(THRIFT_MCROUTER_SOURCE_DIR "" CACHE PATH
+  "Path to a mcrouter source checkout used by Carbon codegen and benchmarks")
+set(THRIFT_MCROUTER_CARBON_CODEGEN_EXECUTABLE "" CACHE FILEPATH
+  "Full Carbon generator provider used by the explicit McrouterCarbonCodegen targets")
 
 # Benchmarks link thriftcpp2, which only exists when RPC is on. Force
 # benchmarks off whenever RPC is off so the two options can never disagree.
 if (NOT THRIFT_RPC AND THRIFT_BENCHMARKS)
   message(STATUS "THRIFT_RPC=OFF forces THRIFT_BENCHMARKS=OFF (benchmarks link thriftcpp2).")
   set(THRIFT_BENCHMARKS OFF)
+endif ()
+if (THRIFT_CARBON_PROTOCOL_BENCHMARK AND NOT THRIFT_RPC)
+  message(FATAL_ERROR
+    "THRIFT_CARBON_PROTOCOL_BENCHMARK requires THRIFT_RPC=ON because it "
+    "links thriftcpp2.")
+endif ()
+if (THRIFT_HTTP2 AND NOT THRIFT_RPC)
+  message(FATAL_ERROR "THRIFT_HTTP2 requires THRIFT_RPC.")
 endif ()
 if (THRIFT_COMPILER_ONLY OR THRIFT_LIB_ONLY)
   set(build_all OFF)
@@ -127,7 +139,14 @@ find_package(folly CONFIG REQUIRED)
 # Find required dependencies for the Thrift compiler.
 if (THRIFT_COMPILER_ONLY OR build_all)
   include_directories(${OPENSSL_INCLUDE_DIR})
-  set(THRIFT1 thrift1)
+  # A full-tree build needs the runtime schema types in order to build the
+  # schema-capable compiler. Use the bootstrap compiler for those runtime
+  # generation edges; later consumers can explicitly select the final thrift1.
+  if (build_all)
+    set(THRIFT1 thrift1_bootstrap)
+  else ()
+    set(THRIFT1 thrift1)
+  endif ()
   set(THRIFTCPP2 thriftcpp2)
   include(ThriftLibrary.cmake)
   install(FILES ThriftLibrary.cmake DESTINATION ${INCLUDE_INSTALL_DIR}/thrift)
@@ -140,6 +159,9 @@ if (THRIFT_LIB_ONLY OR build_all)
   if (THRIFT_RPC)
     find_package(fizz CONFIG REQUIRED)
     find_package(wangle CONFIG REQUIRED)
+    if (THRIFT_HTTP2)
+      find_package(proxygen CONFIG REQUIRED)
+    endif ()
   endif ()
   find_package(ZLIB REQUIRED)
   find_package(Zstd REQUIRED)
@@ -181,6 +203,10 @@ if(enable_tests)
     ${GTEST_INCLUDE_DIRS}
     ${GMOCK_INCLUDE_DIRS}
   )
+  # POST_BUILD discovery can run many test executables in parallel. Current
+  # CMake releases give those invocations a shared temporary JSON path, so
+  # they race. PRE_TEST discovery is serialized by CTest.
+  set(CMAKE_GTEST_DISCOVER_TESTS_DISCOVERY_MODE PRE_TEST)
   enable_testing()
 endif(enable_tests)
 

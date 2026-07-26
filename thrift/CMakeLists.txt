@@ -20,17 +20,62 @@ endif ()
 
 if (THRIFT_LIB_ONLY OR build_all)
   add_subdirectory(annotation)
-  add_subdirectory(conformance)
+  if (THRIFT_RPC)
+    add_subdirectory(conformance)
+  endif ()
   add_subdirectory(lib)
 endif ()
 
-if (enable_tests OR build_all)
+if (THRIFT_RPC AND THRIFT_BENCHMARKS)
   add_subdirectory(perf)
+endif ()
+
+if (enable_tests)
   add_subdirectory(test)
 endif ()
 
 # Install CMake package configuration files for Thrift.
 include(CMakePackageConfigHelpers)
+
+# Normalize build options before substituting them into the installed package
+# config. In particular, thriftpy may be the truthy cache value AUTO; package
+# component results must be canonical booleans. Keep compiler and library
+# capabilities separate because modular installs do not contain both.
+set(FBTHRIFT_BUILD_COMPILER OFF)
+if (THRIFT_COMPILER_ONLY OR build_all)
+  set(FBTHRIFT_BUILD_COMPILER ON)
+endif ()
+
+set(FBTHRIFT_BUILD_LIBRARIES OFF)
+if (THRIFT_LIB_ONLY OR build_all)
+  set(FBTHRIFT_BUILD_LIBRARIES ON)
+endif ()
+
+set(FBTHRIFT_BUILD_RPC OFF)
+if (FBTHRIFT_BUILD_LIBRARIES AND THRIFT_RPC)
+  set(FBTHRIFT_BUILD_RPC ON)
+endif ()
+
+set(FBTHRIFT_BUILD_HTTP2 OFF)
+if (FBTHRIFT_BUILD_RPC AND THRIFT_HTTP2)
+  set(FBTHRIFT_BUILD_HTTP2 ON)
+endif ()
+
+set(FBTHRIFT_COMPONENT_PY OFF)
+if (FBTHRIFT_BUILD_LIBRARIES AND thriftpy)
+  set(FBTHRIFT_COMPONENT_PY ON)
+endif ()
+
+set(FBTHRIFT_COMPONENT_PY3 OFF)
+if (FBTHRIFT_BUILD_LIBRARIES AND thriftpy3)
+  set(FBTHRIFT_COMPONENT_PY3 ON)
+endif ()
+
+set(FBTHRIFT_COMPONENT_PYTHON OFF)
+if (FBTHRIFT_BUILD_LIBRARIES AND thrift_python)
+  set(FBTHRIFT_COMPONENT_PYTHON ON)
+endif ()
+
 configure_package_config_file(
   cmake/FBThriftConfig.cmake.in
   FBThriftConfig.cmake
@@ -42,6 +87,18 @@ configure_package_config_file(
 )
 install(
   FILES ${CMAKE_CURRENT_BINARY_DIR}/FBThriftConfig.cmake
+  DESTINATION ${CMAKE_INSTALL_DIR}
+)
+# Keep installed package discovery independent of fbcode_builder and of the
+# fbthrift source tree. These compatibility finders cover dependencies that do
+# not consistently ship upstream CMake package configs.
+install(
+  FILES
+    cmake/FindGflags.cmake
+    cmake/FindGlog.cmake
+    cmake/FindOpenSSL.cmake
+    cmake/FindSodium.cmake
+    cmake/FindXxhash.cmake
   DESTINATION ${CMAKE_INSTALL_DIR}
 )
 install(

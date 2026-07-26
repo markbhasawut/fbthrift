@@ -2,14 +2,11 @@
 #
 # CMake package configuration file for fbthrift
 #
-# Defines the target "FBThrift::thriftcpp2"
-# Add this to your target_link_libraries() call to depend on thrift.
-#
-# Note that fbthrift depends on the wangle::wangle target.  This should
-# be found by calling find_package(wangle CONFIG) before finding fbthrift.
-#
-# This also defines the following variables
-# FBTHRIFT_COMPILER - The path to the thrift compiler
+# Defines the imported targets built by this fbthrift configuration and the
+# following variables:
+#   FBTHRIFT_COMPILER    - path to thrift1, or empty for a library-only package
+#   FBTHRIFT_CMAKE_DIR   - directory containing FBThriftTargets.cmake
+#   FBTHRIFT_INCLUDE_DIR - installed include root
 #
 
 @PACKAGE_INIT@
@@ -23,19 +20,43 @@ set(FBTHRIFT_PREFIX_DIR "${PACKAGE_PREFIX_DIR}")
 
 set_and_check(FBTHRIFT_CMAKE_DIR "@PACKAGE_CMAKE_INSTALL_DIR@")
 set_and_check(FBTHRIFT_INCLUDE_DIR "@PACKAGE_INCLUDE_INSTALL_DIR@")
-if (WIN32)
-  set_and_check(FBTHRIFT_COMPILER "@PACKAGE_BIN_INSTALL_DIR@/thrift1.exe")
-else()
-  set_and_check(FBTHRIFT_COMPILER "@PACKAGE_BIN_INSTALL_DIR@/thrift1")
+if (@FBTHRIFT_BUILD_COMPILER@)
+  if (WIN32)
+    set_and_check(FBTHRIFT_COMPILER "@PACKAGE_BIN_INSTALL_DIR@/thrift1.exe")
+  else()
+    set_and_check(FBTHRIFT_COMPILER "@PACKAGE_BIN_INSTALL_DIR@/thrift1")
+  endif()
+else ()
+  set(FBTHRIFT_COMPILER "")
 endif()
 
-find_dependency(Xxhash REQUIRED)
-find_dependency(ZLIB REQUIRED)
-find_package(mvfst CONFIG)
+# Dependencies referenced by the exported target interfaces must exist before
+# FBThriftTargets.cmake is loaded. Narrow modular packages avoid RPC-only
+# dependency discovery. Scope fbthrift's installed compatibility finders to
+# package loading so consumers do not need fbcode_builder or a source-tree
+# CMAKE_MODULE_PATH, and so we do not permanently mutate their search policy.
+set(_FBTHRIFT_SAVED_CMAKE_MODULE_PATH "${CMAKE_MODULE_PATH}")
+list(PREPEND CMAKE_MODULE_PATH "${FBTHRIFT_CMAKE_DIR}")
+find_dependency(Boost REQUIRED)
+find_dependency(fmt CONFIG REQUIRED)
+find_dependency(folly CONFIG REQUIRED)
+if (@FBTHRIFT_BUILD_LIBRARIES@)
+  find_dependency(Xxhash REQUIRED)
+endif ()
+if (@FBTHRIFT_BUILD_RPC@)
+  find_dependency(ZLIB REQUIRED)
+  find_dependency(wangle CONFIG REQUIRED)
+endif ()
+if (@FBTHRIFT_BUILD_HTTP2@)
+  find_dependency(proxygen CONFIG REQUIRED)
+endif ()
+set(CMAKE_MODULE_PATH "${_FBTHRIFT_SAVED_CMAKE_MODULE_PATH}")
+unset(_FBTHRIFT_SAVED_CMAKE_MODULE_PATH)
 
-if (NOT TARGET FBThrift::thriftcpp2)
-  include("${FBTHRIFT_CMAKE_DIR}/FBThriftTargets.cmake")
-endif()
+# CMake-generated export files are idempotent: they return early when every
+# expected target is already defined. Do not use thriftcpp2 as the guard; that
+# target is intentionally absent from compiler-only and THRIFT_RPC=OFF builds.
+include("${FBTHRIFT_CMAKE_DIR}/FBThriftTargets.cmake")
 
 #
 # Component definitions
@@ -44,15 +65,25 @@ endif()
 # e.g., "find_package(FBThrift COMPONENTS py)"
 #
 
-# We always build the cpp2 generator and its libraries
-set(FBThrift_cpp2_FOUND True)
+# Compiler availability is separate from language runtime availability.
+set(FBThrift_compiler_FOUND @FBTHRIFT_BUILD_COMPILER@)
+
+# cpp and cpp2 are equivalent public names for the modern C++ RPC runtime.
+# Protocol-only installations still export narrow targets such as
+# FBThrift::thriftprotocol, but do not contain FBThrift::thriftcpp2.
+set(FBThrift_cpp_FOUND @FBTHRIFT_BUILD_RPC@)
+set(FBThrift_cpp2_FOUND @FBTHRIFT_BUILD_RPC@)
 
 # Set FBThrift_py_FOUND if we built the thrift/lib/py library that supports
 # the output from the thrift compiler's "py" generator.
 # (Note that this generator is deprecated in favor of the "python" generator.)
-set(FBThrift_py_FOUND @thriftpy@)
+set(FBThrift_py_FOUND @FBTHRIFT_COMPONENT_PY@)
 
-set(FBThrift_python_FOUND @thrift_python@)
+# Set when the deprecated thrift.py3 Cython runtime was built.
+set(FBThrift_py3_FOUND @FBTHRIFT_COMPONENT_PY3@)
+
+# Set when the modern thrift.python Cython runtime was built.
+set(FBThrift_python_FOUND @FBTHRIFT_COMPONENT_PYTHON@)
 
 set(FBThrift_FOUND True)
 check_required_components(FBThrift)

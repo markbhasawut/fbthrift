@@ -103,7 +103,8 @@ uint32_t invoke(const WriteOp& write, W& writer) {
 
     default:
       folly::throw_exception<std::runtime_error>(
-          fmt::format("Unknown write call: {}", write.getType()));
+          fmt::format(
+              "Unknown write call: {}", static_cast<int>(write.getType())));
   }
 }
 

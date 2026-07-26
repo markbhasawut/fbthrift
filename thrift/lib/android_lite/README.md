@@ -19,17 +19,18 @@ the runtime JAR to the Android application. The historical implementation name
 
 ## Build and test
 
-Maven is the authoritative build. JDK 17 or newer is recommended for the build;
-the resulting runtime remains compatible with Java 8 bytecode.
+Maven is the authoritative build. Use JDK 21 or JDK 25, matching the parent
+FBThrift Java reactor; the resulting Android Lite runtime remains compatible
+with Java 8 bytecode.
 
 ```sh
-cd thrift/lib/android_lite
-mvn verify
+mvn -f thrift/lib/java/pom.xml -pl ../android_lite -am verify
 ```
 
-The runtime JAR is written to `target/fbthrift-android-lite.jar`. Run
-`mvn package` when tests
-are not required, or `mvn javadoc:javadoc` to build API documentation.
+The runtime JAR is written to
+`thrift/lib/android_lite/target/fbthrift-android-lite.jar`. Run `mvn package`
+when tests are not required, or `mvn javadoc:javadoc` to build API
+documentation.
 
 The former Ant build targeted Java 5 and predated the current JUnit 5 test
 suite. It has been removed rather than retained as a second, untested build

@@ -228,7 +228,9 @@ an unknown generator option through to `thrift1`.
 Use `thrift1 --help` for the compiler-matched option inventory. The detailed
 OSS references are:
 
+- [Complete compiler generator catalog](generators.md)
 - [C++ code generation options](cpp/code-generation.md)
+- [Java code generation and Maven build](java.md)
 - [Python code generation options](python.md)
 
 Options are backend-specific. Structured annotations are per-definition IDL

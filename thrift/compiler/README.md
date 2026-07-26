@@ -7,9 +7,15 @@ languages.
 The complete OSS cpp2 option reference, generated-file contract, static-link
 requirements, and CMake usage are documented in
 [`../doc/languages/cpp/code-generation.md`](../doc/languages/cpp/code-generation.md).
-The `py`, `py3`, and `python` runtime matrix, option references, output
-contracts, and CMake integration are documented in
+The Python runtime matrix, `pyi`, `python_capi`, and `python_patch` companions,
+option references, output contracts, and CMake integration are documented in
 [`../doc/languages/python.md`](../doc/languages/python.md).
+The modern, deprecated, and Android Lite Java generators and Maven reactor are
+documented in
+[`../doc/languages/java.md`](../doc/languages/java.md).
+The registration-derived inventory of every generator, legacy name, output
+directory, option family, and framework/template distinction is documented in
+[`../doc/languages/generators.md`](../doc/languages/generators.md).
 
 ## Directory Layout
 

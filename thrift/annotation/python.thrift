@@ -101,7 +101,7 @@ struct Adapter {
 /// By default, struct uses marshal C API unless cpp.Type or cpp.Adapter is present
 /// on a field or a type
 /// Use this annotation to opt-in struct to marshal in spite of cpp.Type or cpp.Adapter
-/// Alternatively, use this struct with serialize = false to use serialization for FFI.
+/// Alternatively, use this struct with serialize = true to use serialization for FFI.
 @scope.Structured
 struct UseCAPI {
   1: bool serialize = false;

@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+// This translation unit has a basename distinct from Cython's sink.cpp output.
+
 #include <folly/Portability.h>
 #include <folly/python/error.h>
 #include <folly/python/import.h>

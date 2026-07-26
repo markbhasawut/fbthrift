@@ -18,7 +18,9 @@
 # created as tree of links to the real source files.
 
 import os
+import shutil
 import sys
+from pathlib import Path
 
 import Cython
 from Cython.Build import cythonize
@@ -35,6 +37,49 @@ include_dirs = ["."]
 if cython_include_path:
     include_dirs.extend([p for p in cython_include_path.split(":") if p])
 
+API_MODULES = (
+    ("thrift/python/_types.pyx", "thrift.python.types"),
+    ("thrift/python/exceptions.pyx", "thrift.python.exceptions"),
+    (
+        "thrift/python/server/python_async_processor.pyx",
+        "thrift.python.server.python_async_processor",
+    ),
+    (
+        "thrift/python/server/request_context.pyx",
+        "thrift.python.server.request_context",
+    ),
+    (
+        "thrift/python/server/interceptor/service_interceptor.pyx",
+        "thrift.python.server.interceptor.service_interceptor",
+    ),
+    (
+        "thrift/python/server_impl/python_async_processor.pyx",
+        "thrift.python.server_impl.python_async_processor",
+    ),
+    (
+        "thrift/python/server_impl/request_context.pyx",
+        "thrift.python.server_impl.request_context",
+    ),
+    (
+        "thrift/python/server_impl/interceptor/service_interceptor.pyx",
+        "thrift.python.server_impl.interceptor.service_interceptor",
+    ),
+    ("thrift/py3/_stream.pyx", "thrift.py3.stream"),
+    ("thrift/python/streaming/sink.pyx", "thrift.python.streaming.sink"),
+    (
+        "thrift/python/streaming/bidistream.pyx",
+        "thrift.python.streaming.bidistream",
+    ),
+    (
+        "thrift/python/streaming/py_promise.pyx",
+        "thrift.python.streaming.py_promise",
+    ),
+    (
+        "thrift/python/client/py_bridge/py_bridge_channel.pyx",
+        "thrift.python.client.py_bridge.py_bridge_channel",
+    ),
+)
+
 if "--api-only" in sys.argv:
     if include_dirs:
         # Create CompilationOptions with include_path
@@ -46,123 +91,82 @@ if "--api-only" in sys.argv:
     else:
         compilation_options = None
 
+    api_output_dir = Path(".cython_api")
+
+    def compile_api(source, full_module_name):
+        source_path = Path(source)
+        output_file = api_output_dir / source_path.with_suffix(".cpp")
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        # Cython refuses to overwrite some generated headers when a C++ type
+        # declaration preamble precedes its generated-file marker. These are
+        # private, deterministic outputs, so remove them before regenerating.
+        for generated_path in (
+            output_file,
+            output_file.with_suffix(".h"),
+            output_file.with_name(f"{output_file.stem}_api.h"),
+        ):
+            generated_path.unlink(missing_ok=True)
+        result = Cython.Compiler.Main.compile(
+            source,
+            options=compilation_options,
+            full_module_name=full_module_name,
+            output_file=str(output_file),
+            cplus=True,
+            language_level=3,
+        )
+        if result.num_errors:
+            raise SystemExit(
+                f"Cython API generation failed for {full_module_name}"
+            )
+        if not result.api_file:
+            raise SystemExit(
+                f"Cython did not generate an API header for {full_module_name}"
+            )
+        api_destination = source_path.with_name(
+            f"{source_path.stem}_api.h"
+        )
+        shutil.copyfile(result.api_file, api_destination)
+        if result.h_file:
+            public_header_destination = source_path.with_suffix(".h")
+            shutil.copyfile(result.h_file, public_header_destination)
+
     # Invoke cython compiler directly instead of calling cythonize().
     # Generating *_api.h files only requires first stage of compilation
-    # # from cython source -> cpp source.
-    Cython.Compiler.Main.compile(
-        "thrift/python/_types.pyx",
-        options=compilation_options,
-        full_module_name="thrift.python.types",
-        cplus=True,
-        language_level=3,
-    )
-    Cython.Compiler.Main.compile(
-        "thrift/python/server/python_async_processor.pyx",
-        options=compilation_options,
-        full_module_name="thrift.python.server.python_async_processor",
-        cplus=True,
-        language_level=3,
-    )
-    Cython.Compiler.Main.compile(
-        "thrift/python/server/request_context.pyx",
-        options=compilation_options,
-        full_module_name="thrift.python.server.request_context",
-        cplus=True,
-        language_level=3,
-    )
-    Cython.Compiler.Main.compile(
-        "thrift/python/server/interceptor/service_interceptor.pyx",
-        options=compilation_options,
-        full_module_name="thrift.python.server.interceptor.service_interceptor",
-        cplus=True,
-        language_level=3,
-    )
-    # Compile server_impl modules (OSS compatibility shim)
-    Cython.Compiler.Main.compile(
-        "thrift/python/server_impl/python_async_processor.pyx",
-        options=compilation_options,
-        full_module_name="thrift.python.server_impl.python_async_processor",
-        cplus=True,
-        language_level=3,
-    )
-    Cython.Compiler.Main.compile(
-        "thrift/python/server_impl/request_context.pyx",
-        options=compilation_options,
-        full_module_name="thrift.python.server_impl.request_context",
-        cplus=True,
-        language_level=3,
-    )
-    Cython.Compiler.Main.compile(
-        "thrift/python/server_impl/interceptor/service_interceptor.pyx",
-        options=compilation_options,
-        full_module_name="thrift.python.server_impl.interceptor.service_interceptor",
-        cplus=True,
-        language_level=3,
-    )
-    Cython.Compiler.Main.compile(
-        "thrift/py3/_stream.pyx",
-        options=compilation_options,
-        full_module_name="thrift.py3.stream",
-        cplus=True,
-        language_level=3,
-    )
-    # Compile streaming modules to generate *_api.h headers
-    Cython.Compiler.Main.compile(
-        "thrift/python/streaming/sink.pyx",
-        options=compilation_options,
-        full_module_name="thrift.python.streaming.sink",
-        cplus=True,
-        language_level=3,
-    )
-    Cython.Compiler.Main.compile(
-        "thrift/python/streaming/bidistream.pyx",
-        options=compilation_options,
-        full_module_name="thrift.python.streaming.bidistream",
-        cplus=True,
-        language_level=3,
-    )
-    Cython.Compiler.Main.compile(
-        "thrift/python/streaming/py_promise.pyx",
-        options=compilation_options,
-        full_module_name="thrift.python.streaming.py_promise",
-        cplus=True,
-        language_level=3,
-    )
-    # Compile py_bridge module to generate py_bridge_channel_api.h; PySender.cpp
-    # includes it, so the header must exist before build_ext compiles the .cpp.
-    Cython.Compiler.Main.compile(
-        "thrift/python/client/py_bridge/py_bridge_channel.pyx",
-        options=compilation_options,
-        full_module_name="thrift.python.client.py_bridge.py_bridge_channel",
-        cplus=True,
-        language_level=3,
-    )
+    # from cython source -> cpp source.
+    for api_source, api_module in API_MODULES:
+        compile_api(api_source, api_module)
 
 else:
     python_lib_idx = sys.argv.index("--libpython")
-    python_lib = sys.argv[python_lib_idx + 1][len("lib") : -len(".so")]
+    python_lib = Path(sys.argv[python_lib_idx + 1]).name.removeprefix("lib")
+    for library_suffix in (".dylib", ".so", ".a", ".lib"):
+        python_lib = python_lib.removesuffix(library_suffix)
     del sys.argv[python_lib_idx : python_lib_idx + 2]
 
     # Library search paths from CMakeLists (passed via LIBRARY_DIRS env var)
     lib_search_paths = os.environ.get("LIBRARY_DIRS", "").split(":")
     lib_search_paths = [p for p in lib_search_paths if p]  # Filter empty strings
 
-    # All C++ dependencies consolidated into libthrift_python_cpp.so
-    # Extensions only need to link to thrift_python_cpp + system libs
-    dynamic_libs = [
-        "thrift_python_cpp",  # Contains all thrift/folly/wangle/fizz code
-        "ssl",
-        "crypto",
-        "pthread",
-        "aio",
-        "glog",
-        "gflags",
-        "event",
-        "lzma",
-        "snappy",
-        "sodium",
-        "unwind",
-    ]
+    # All C++ dependencies are consolidated into libthrift_python_cpp. On
+    # macOS its LC_LOAD_DYLIB entries load those dependencies, and extension
+    # modules use dynamic lookup for their unresolved Python/C++ symbols.
+    if sys.platform == "darwin":
+        dynamic_libs = ["thrift_python_cpp"]
+    else:
+        dynamic_libs = [
+            "thrift_python_cpp",
+            "ssl",
+            "crypto",
+            "pthread",
+            "aio",
+            "glog",
+            "gflags",
+            "event",
+            "lzma",
+            "snappy",
+            "sodium",
+            "unwind",
+        ]
 
     extra_link_args = []
 
@@ -187,9 +191,20 @@ else:
         "include_dirs": include_dirs,
         "library_dirs": lib_search_paths,  # Tell linker where to find dynamic libraries
         "libraries": dynamic_libs + [python_lib],
-        "define_macros": [("THRIFT_HAS_JSON5_PROTOCOL", "1")],
+        "define_macros": [
+            ("THRIFT_HAS_JSON5_PROTOCOL", "1"),
+            ("GLOG_USE_GFLAGS", "1"),
+            ("GLOG_USE_GLOG_EXPORT", "1"),
+        ],
         "extra_compile_args": ["-std=c++20", "-fcoroutines"],
         "extra_link_args": extra_link_args,
+    }
+    server_options = {
+        **common_options,
+        "define_macros": [
+            *common_options["define_macros"],
+            ("__PYX_ENUM_CLASS_DECL", ""),
+        ],
     }
 
     exts = [
@@ -313,12 +328,12 @@ else:
                 "thrift/python/server/interceptor/PythonServiceInterceptor.cpp",
                 "thrift/python/std_libcpp.cpp",
             ],
-            define_macros=[("__PYX_ENUM_CLASS_DECL", "")],
-            **common_options,
+            **server_options,
         ),
         # thrift.python.streaming extension modules
         # Each .pyx file generates to generated/*.cpp (via build_dir="generated")
-        # Handwritten .cpp files (e.g., Sink.cpp, bidi_stream.cpp) are also compiled
+        # Handwritten .cpp files (e.g., SinkBridge.cpp, bidi_stream.cpp) are also
+        # compiled.
         Extension(
             "thrift.python.streaming.stream",
             sources=["thrift/python/streaming/stream.pyx"],
@@ -341,7 +356,7 @@ else:
             "thrift.python.streaming.sink",
             sources=[
                 "thrift/python/streaming/sink.pyx",
-                "thrift/python/streaming/Sink.cpp",
+                "thrift/python/streaming/SinkBridge.cpp",
             ],
             **common_options,
         ),
@@ -576,6 +591,19 @@ else:
     # Test-only package (directory created by test symlinks)
     if os.environ.get("THRIFT_BUILD_TESTS", "0") == "1":
         packages.append("thrift.lib.python.client")
+
+    # API headers can contain a C++ declaration preamble before Cython's
+    # generated-file marker. Remove these private build-dir outputs and their
+    # translation units so cythonize regenerates them instead of rejecting its
+    # own previous output.
+    for api_source, _ in API_MODULES:
+        generated_cpp = Path("generated") / Path(api_source).with_suffix(".cpp")
+        for generated_path in (
+            generated_cpp,
+            generated_cpp.with_suffix(".h"),
+            generated_cpp.with_name(f"{generated_cpp.stem}_api.h"),
+        ):
+            generated_path.unlink(missing_ok=True)
 
     setup(
         name="thrift",

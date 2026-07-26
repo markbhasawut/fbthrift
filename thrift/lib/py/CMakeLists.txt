@@ -12,8 +12,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-include(FBPythonBinary)
-
 set(
   THRIFT_PY_SRCS
   "TMultiplexedProcessor.py"
@@ -53,25 +51,65 @@ set(
   "util/randomizer.py"
   "util/remote.py"
 )
-# thrift_py has external dependencies on "future" python
-# package.  It will use the "snappy" and "zstd" compression packages if they
-# are available, but does not require them.
-add_fb_python_library(
-  thrift_py
-  SOURCES ${THRIFT_PY_SRCS}
-  NAMESPACE "thrift"
-)
-install_fb_python_library(
-  thrift_py
-  EXPORT fbthrift-exports
+
+# Preserve the FB Python archive-manifest contract without requiring
+# FBPythonBinary.cmake in a standalone OSS build. Downstream fbcode_builder
+# consumers can still consume these imported interface targets because their
+# INTERFACE_SOURCES and manifest properties are identical.
+set(
+  FBTHRIFT_PY_ARCHIVE_INSTALL_DIR
+  "lib/fb-py-libs"
+  CACHE STRING
+  "Install directory for legacy py runtime archive manifests"
 )
 
-add_fb_python_library(
-  thrift_py_inspect
-  SOURCES "util/inspect.py"
-  NAMESPACE "thrift"
-)
-install_fb_python_library(
-  thrift_py_inspect
-  EXPORT fbthrift-exports
-)
+function(add_fbthrift_py_archive library_name namespace)
+  string(REPLACE "." "/" namespace_dir "${namespace}")
+  set(manifest "${CMAKE_CURRENT_BINARY_DIR}/${library_name}.manifest")
+  set(manifest_tmp "${manifest}.tmp")
+  file(WRITE "${manifest_tmp}" "FBPY_MANIFEST 1\n")
+
+  add_library("${library_name}.py_lib" INTERFACE)
+  foreach(source IN LISTS ARGN)
+    get_filename_component(
+      absolute_source "${source}" ABSOLUTE
+      BASE_DIR "${CMAKE_CURRENT_SOURCE_DIR}"
+    )
+    set(destination "${namespace_dir}/${source}")
+    target_sources(
+      "${library_name}.py_lib"
+      INTERFACE
+        "$<BUILD_INTERFACE:${absolute_source}>"
+        "$<INSTALL_INTERFACE:${FBTHRIFT_PY_ARCHIVE_INSTALL_DIR}/${library_name}/${destination}>"
+    )
+    file(APPEND "${manifest_tmp}" "${absolute_source} :: ${destination}\n")
+
+    get_filename_component(destination_directory "${destination}" DIRECTORY)
+    install(
+      FILES "${absolute_source}"
+      DESTINATION
+        "${FBTHRIFT_PY_ARCHIVE_INSTALL_DIR}/${library_name}/${destination_directory}"
+    )
+  endforeach ()
+
+  configure_file("${manifest_tmp}" "${manifest}" COPYONLY)
+  target_include_directories(
+    "${library_name}.py_lib"
+    INTERFACE
+      "$<BUILD_INTERFACE:${manifest}>"
+      "$<INSTALL_INTERFACE:${FBTHRIFT_PY_ARCHIVE_INSTALL_DIR}/${library_name}.manifest>"
+  )
+  install(
+    TARGETS "${library_name}.py_lib"
+    EXPORT fbthrift-exports
+  )
+  install(
+    FILES "${manifest}"
+    DESTINATION "${FBTHRIFT_PY_ARCHIVE_INSTALL_DIR}"
+  )
+endfunction()
+
+# thrift_py has an external dependency on the "future" Python package. It uses
+# snappy and zstd when available, but does not require them.
+add_fbthrift_py_archive(thrift_py thrift ${THRIFT_PY_SRCS})
+add_fbthrift_py_archive(thrift_py_inspect thrift "util/inspect.py")

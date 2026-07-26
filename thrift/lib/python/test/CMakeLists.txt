@@ -758,10 +758,22 @@ thrift_python_library_for_test(
 # Note: Cython/setuptools uses "lib.linux-<arch>-cpython-<version>" format
 # (e.g., lib.linux-x86_64-cpython-310)
 set(_cybld_base "${CMAKE_BINARY_DIR}/thrift/lib/cybld")
-set(_py_ver "${Python3_VERSION_MAJOR}${Python3_VERSION_MINOR}")
-set(_cybld_suffix
-  "build/lib.linux-${CMAKE_HOST_SYSTEM_PROCESSOR}-cpython-${_py_ver}")
-set(_cybld "${_cybld_base}/${_cybld_suffix}")
+file(GLOB _cybld_dirs "${_cybld_base}/build/lib.*")
+if(_cybld_dirs)
+  list(GET _cybld_dirs 0 _cybld)
+else()
+  set(_py_ver "${Python3_VERSION_MAJOR}${Python3_VERSION_MINOR}")
+  if(APPLE)
+    set(_os_prefix "macosx*")
+  elseif(WIN32)
+    set(_os_prefix "win*")
+  else()
+    set(_os_prefix "linux*")
+  endif()
+  set(_cybld_suffix
+    "build/lib.${_os_prefix}-${CMAKE_HOST_SYSTEM_PROCESSOR}-cpython-${_py_ver}")
+  set(_cybld "${_cybld_base}/${_cybld_suffix}")
+endif()
 set(_gen_python "${CMAKE_CURRENT_BINARY_DIR}/gen-python")
 
 #####
@@ -813,9 +825,9 @@ add_custom_target(install_thrift_wheel ALL
 # - _cybld: Cython test extensions (.so files)
 # - _cybld_base: Pure Python test modules (adapters, etc.) - symlinked sources
 string(CONCAT TEST_PYTHONPATH
-  "${_thrift_wheel_install_dir}"
-  ":${_cybld}"
+  "${_cybld}"
   ":${_cybld_base}"
+  ":${_thrift_wheel_install_dir}"
   ":${_gen_python}")
 
 #####
@@ -963,6 +975,13 @@ add_dependencies(thrift_python_test_package
 # The wheel must be self-contained: auditwheel bundles deps into .libs/,
 # and RPATH $ORIGIN/.libs finds them. If tests fail, the wheel isn't portable.
 set(_test_env "PYTHONPATH=${TEST_PYTHONPATH}")
+if(APPLE)
+  list(APPEND _test_env "DYLD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/lib:$ENV{DYLD_LIBRARY_PATH}")
+elseif(WIN32)
+  list(APPEND _test_env "PATH=${CMAKE_BINARY_DIR}/lib;$ENV{PATH}")
+else()
+  list(APPEND _test_env "LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/lib:$ENV{LD_LIBRARY_PATH}")
+endif()
 
 register_python_tests(thrift_python fbthrift_test
   "${_test_env}" "${_gen_python}" ${THRIFT_PYTHON_TEST_FILES})

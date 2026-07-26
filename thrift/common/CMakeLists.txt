@@ -28,6 +28,15 @@ install(
   FILES_MATCHING PATTERN "*.h" PATTERN "*.tcc"
 )
 
+# common is used by both compiler and runtime exports. Export it at its owning
+# directory so compiler-only, library-only, and full builds all produce a
+# self-contained FBThriftTargets.cmake.
+install(
+  TARGETS common
+  EXPORT fbthrift-exports
+  DESTINATION ${LIB_INSTALL_DIR}
+)
+
 target_link_libraries(
   common
   Boost::boost
@@ -36,17 +45,26 @@ target_link_libraries(
 
 if (enable_tests)
   include(GoogleTest)
+  set(COMMON_TEST_TARGETS)
   foreach (test_name tree_printer_test universal_name_test)
-    add_executable(Common_${test_name}
+    set(test_target "Common_${test_name}")
+    add_executable(${test_target}
       test/${test_name}.cc
     )
-    target_link_libraries(Common_${test_name}
-      PUBLIC
+    target_link_libraries(${test_target}
+      PRIVATE
         GTest::gtest_main
         common
         Folly::folly
         fmt::fmt
     )
-    gtest_discover_tests(Common_${test_name})
+    gtest_discover_tests(
+      ${test_target}
+      TEST_PREFIX "Common."
+      PROPERTIES LABELS "common"
+    )
+    list(APPEND COMMON_TEST_TARGETS ${test_target})
   endforeach ()
+
+  add_custom_target(common_tests DEPENDS ${COMMON_TEST_TARGETS})
 endif ()

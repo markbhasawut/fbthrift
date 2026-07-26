@@ -122,11 +122,19 @@ thrift_generate(
   THRIFT_INCLUDE_DIRECTORIES ${THRIFT_SOURCE_DIR}
 )
 
+# The cpp2 `any` option emits registration code against
+# thrift/conformance/cpp2/AnyRegistry.h. Conformance is part of the RPC graph;
+# a protocol/type-only build must not acquire that otherwise-hidden dependency.
+set(THRIFT_PROTOCOL_CPP2_OPTIONS "")
+if (THRIFT_RPC)
+  set(THRIFT_PROTOCOL_CPP2_OPTIONS "any")
+endif ()
+
 thrift_generate(
   "protocol" #file_name
   "" #services
   "cpp2" #language
-  "" #options
+  "${THRIFT_PROTOCOL_CPP2_OPTIONS}" #options
   "${CMAKE_CURRENT_SOURCE_DIR}" #file_path
   "${CMAKE_CURRENT_BINARY_DIR}" #output_path
   "thrift/lib/thrift" #include_prefix
@@ -137,7 +145,7 @@ thrift_generate(
   "protocol_detail" #file_name
   "" #services
   "cpp2" #language
-  "" #options
+  "${THRIFT_PROTOCOL_CPP2_OPTIONS}" #options
   "${CMAKE_CURRENT_SOURCE_DIR}" #file_path
   "${CMAKE_CURRENT_BINARY_DIR}" #output_path
   "thrift/lib/thrift" #include_prefix

@@ -20,6 +20,9 @@ if (THRIFT_LIB_ONLY OR build_all)
 endif ()
 
 if (enable_tests)
+  # Defines shared generated fixtures and cpp2_test_support for the other
+  # cpp2 test directories.
+  add_subdirectory(test)
   add_subdirectory(protocol/test)
   add_subdirectory(transcode/test)
   add_subdirectory(fast_thrift/test)
@@ -34,7 +37,6 @@ if (enable_tests)
   add_subdirectory(patch/test)
   add_subdirectory(runtime/test)
   add_subdirectory(security/test)
-  add_subdirectory(test)
 endif ()
 
 #######
@@ -45,7 +47,15 @@ endif ()
 # Using global properties gets around this; probably better to restructure
 # the directories/files to avoid this type of hack
 #
+get_property(any-cpp2-SOURCES GLOBAL PROPERTY any-cpp2-SOURCES)
+get_property(any_patch-cpp2-SOURCES GLOBAL PROPERTY any_patch-cpp2-SOURCES)
+get_property(any_patch_detail-cpp2-SOURCES GLOBAL PROPERTY
+  any_patch_detail-cpp2-SOURCES)
 get_property(any_rep-cpp2-SOURCES GLOBAL PROPERTY any_rep-cpp2-SOURCES)
+get_property(ast-cpp2-SOURCES GLOBAL PROPERTY ast-cpp2-SOURCES)
+get_property(dynamic-cpp2-SOURCES GLOBAL PROPERTY dynamic-cpp2-SOURCES)
+get_property(patch-cpp2-SOURCES GLOBAL PROPERTY patch-cpp2-SOURCES)
+get_property(patch_op-cpp2-SOURCES GLOBAL PROPERTY patch_op-cpp2-SOURCES)
 get_property(RpcMetadata-cpp2-SOURCES GLOBAL PROPERTY RpcMetadata-cpp2-SOURCES)
 get_property(metadata-cpp2-SOURCES GLOBAL PROPERTY metadata-cpp2-SOURCES)
 get_property(frozen-cpp2-SOURCES GLOBAL PROPERTY frozen-cpp2-SOURCES)
@@ -60,6 +70,7 @@ get_property(serverdbginfo-cpp2-SOURCES GLOBAL PROPERTY
 get_property(protocol-cpp2-SOURCES GLOBAL PROPERTY protocol-cpp2-SOURCES)
 get_property(protocol_detail-cpp2-SOURCES GLOBAL PROPERTY
   protocol_detail-cpp2-SOURCES)
+get_property(field_mask-cpp2-SOURCES GLOBAL PROPERTY field_mask-cpp2-SOURCES)
 get_property(record-cpp2-SOURCES GLOBAL PROPERTY record-cpp2-SOURCES)
 
 get_property(schema-cpp2-SOURCES GLOBAL PROPERTY schema-cpp2-SOURCES)
@@ -78,6 +89,7 @@ bypass_source_check("${protocol_detail-cpp2-SOURCES}")
 bypass_source_check("${type_system-cpp2-SOURCES}")
 bypass_source_check("${schema-cpp2-SOURCES}")
 bypass_source_check("${record-cpp2-SOURCES}")
+bypass_source_check("${ast-cpp2-SOURCES}")
 bypass_source_check("${syntax_graph-cpp2-SOURCES}")
 bypass_source_check("${service_catalog-cpp2-SOURCES}")
 bypass_source_check("${metadata-cpp2-SOURCES}")
@@ -110,6 +122,7 @@ add_library(
   ${type_system-cpp2-SOURCES}
   ${schema-cpp2-SOURCES}
   ${record-cpp2-SOURCES}
+  ${ast-cpp2-SOURCES}
   ${syntax_graph-cpp2-SOURCES}
   ${service_catalog-cpp2-SOURCES}
 )
@@ -121,8 +134,18 @@ add_dependencies(thriftmetadata metadata-cpp2-target
   type_system-cpp2-target
   schema-cpp2-target
   record-cpp2-target
+  ast-cpp2-target
   syntax_graph-cpp2-target
   service_catalog-cpp2-target)
+# `cpp2:any` makes protocol serialization include these generated conformance
+# headers. Model the header-generation edge directly without depending on the
+# conformance archive, which already depends on thriftmetadata.
+if (THRIFT_RPC)
+  add_dependencies(thriftmetadata
+    conformance_any-cpp2-target
+    conformance_protocol-cpp2-target
+    conformance_type-cpp2-target)
+endif ()
 target_link_libraries(
   thriftmetadata
   PUBLIC
@@ -154,8 +177,11 @@ target_link_libraries(
     thriftprotocol
 )
 
+bypass_source_check("${dynamic-cpp2-SOURCES}")
 add_library(
   thrift_dynamic_value
+
+  ${dynamic-cpp2-SOURCES}
 
   dynamic/Any.cpp
   dynamic/Binary.cpp
@@ -198,7 +224,8 @@ add_library(
   schema/SyntaxGraph.cpp
   runtime/SchemaRegistry.cpp
 )
-add_dependencies(thrift_dynamic_value thriftmetadata thriftprotocol thrift_path)
+add_dependencies(thrift_dynamic_value dynamic-cpp2-target thriftmetadata
+  thriftprotocol thrift_path)
 target_link_libraries(
   thrift_dynamic_value
   PUBLIC
@@ -253,11 +280,19 @@ target_link_libraries(
 )
 
 bypass_source_check("${type-cpp2-SOURCES}")
+bypass_source_check("${any-cpp2-SOURCES}")
+bypass_source_check("${any_patch-cpp2-SOURCES}")
+bypass_source_check("${any_patch_detail-cpp2-SOURCES}")
 bypass_source_check("${any_rep-cpp2-SOURCES}")
+bypass_source_check("${patch-cpp2-SOURCES}")
 add_library(
   thrifttype
 
+  ${any-cpp2-SOURCES}
+  ${any_patch-cpp2-SOURCES}
+  ${any_patch_detail-cpp2-SOURCES}
   ${any_rep-cpp2-SOURCES}
+  ${patch-cpp2-SOURCES}
   ${type-cpp2-SOURCES}
 
   op/Serializer.cpp
@@ -275,8 +310,21 @@ add_library(
   type/TypeRegistry.cpp
   type/UniversalName.cpp
 )
-add_dependencies(thrifttype any_rep-cpp2-target type-cpp2-target
-  thriftannotation thrifttyperep thriftprotocol)
+add_dependencies(
+  thrifttype
+  any-cpp2-target
+  any_patch-cpp2-target
+  any_patch_detail-cpp2-target
+  any_rep-cpp2-target
+  patch-cpp2-target
+  record-cpp2-target
+  type-cpp2-target
+  type_id-cpp2-target
+  type_system-cpp2-target
+  thriftannotation
+  thrifttyperep
+  thriftprotocol
+)
 target_link_libraries(
   thrifttype
   PUBLIC
@@ -286,6 +334,13 @@ target_link_libraries(
     thrifttyperep
     thriftprotocol
 )
+
+# thriftmetadata owns the generated schema/AST sources. Those generated files
+# embed standard.thrift and type.thrift values whose implementations live in
+# thrifttype (and transitively thrifttyperep). This edge is acyclic:
+# thrifttype depends on thriftprotocol, but neither runtime type library depends
+# on thriftmetadata.
+target_link_libraries(thriftmetadata PUBLIC thrifttype)
 
 # thriftanyrep sources are now compiled into thrifttype to avoid a circular
 # shared library dependency. Keep thriftanyrep as a thin wrapper so that
@@ -323,8 +378,13 @@ target_link_libraries(
     Folly::folly
 )
 
+bypass_source_check("${field_mask-cpp2-SOURCES}")
+bypass_source_check("${patch_op-cpp2-SOURCES}")
 add_library(
   thriftprotocol
+
+  ${field_mask-cpp2-SOURCES}
+  ${patch_op-cpp2-SOURCES}
 
   protocol/Protocol.cpp
   protocol/BinaryProtocol.cpp
@@ -359,6 +419,19 @@ add_library(
   ../cpp/protocol/TProtocolException.cpp
   ../cpp/protocol/TType.cpp
   ../cpp/util/VarintUtils.cpp
+  ../thrift/TypeToMaskAdapter.cpp
+)
+add_dependencies(
+  thriftprotocol
+  any_patch_detail-cpp2-target
+  any_rep-cpp2-target
+  field_mask-cpp2-target
+  id-cpp2-target
+  patch_op-cpp2-target
+  protocol-cpp2-target
+  standard-cpp2-target
+  type-cpp2-target
+  type_rep-cpp2-target
 )
 target_compile_definitions(thriftprotocol PUBLIC THRIFT_HAS_JSON5_PROTOCOL)
 target_link_libraries(
@@ -397,6 +470,20 @@ target_link_libraries(
 if (THRIFT_RPC)
 bypass_source_check("${RocketUpgrade-cpp2-SOURCES}")
 bypass_source_check("${thrift_catalog_service-cpp2-SOURCES}")
+set(THRIFTCPP2_HTTP2_SOURCES)
+if (THRIFT_HTTP2)
+  list(APPEND THRIFTCPP2_HTTP2_SOURCES
+    async/HTTPClientChannel.cpp
+    transport/http2/client/H2ClientConnection.cpp
+    transport/http2/client/ThriftTransactionHandler.cpp
+    transport/http2/common/H2Channel.cpp
+    transport/http2/common/HTTP2RoutingHandler.cpp
+    transport/http2/common/SingleRpcChannel.cpp
+    transport/http2/server/ThriftRequestHandler.cpp
+    transport/util/ConnectionManager.cpp
+    transport/util/ConnectionThread.cpp
+  )
+endif ()
 add_library(
   thriftcpp2
 
@@ -417,7 +504,6 @@ add_library(
   async/Cpp2Channel.cpp
   async/DuplexChannel.cpp
   async/FramingHandler.cpp
-  async/HTTPClientChannel.cpp
   async/HeaderChannel.cpp
   async/HeaderChannelTrait.cpp
   async/HeaderClientChannel.cpp
@@ -484,6 +570,11 @@ add_library(
   fast_thrift/thrift/server/FastThriftServerRegistry.cpp
   fast_thrift/thrift/server/ThriftServerChannel.cpp
   fast_thrift/thrift/server/ThriftServerConnectionFactory.cpp
+  fast_thrift/thrift/server/adapter/MetadataAppAdapter.cpp
+  fast_thrift/thrift/server/adapter/ThriftServerAppAdapter.cpp
+  fast_thrift/thrift/server/adapter/ThriftServerCompositeAppAdapter.cpp
+  fast_thrift/thrift/server/adapter/ThriftServerTransportAdapter.cpp
+  fast_thrift/thrift/server/util/RocketFrameDecoder.cpp
   fast_thrift/transport/TransportHandler.cpp
   logging/ThriftBiDiLog.cpp
   logging/ThriftConnectionLog.cpp
@@ -551,14 +642,6 @@ add_library(
   transport/core/ThriftClient.cpp
   transport/core/ThriftClientCallback.cpp
   transport/core/ThriftRequest.cpp
-  transport/http2/client/H2ClientConnection.cpp
-  transport/http2/client/ThriftTransactionHandler.cpp
-  transport/http2/common/H2Channel.cpp
-  transport/http2/common/HTTP2RoutingHandler.cpp
-  transport/http2/common/SingleRpcChannel.cpp
-  transport/http2/server/ThriftRequestHandler.cpp
-  transport/util/ConnectionManager.cpp
-  transport/util/ConnectionThread.cpp
   transport/rocket/FdSocket.cpp
   transport/rocket/ChecksumGenerator.cpp
   transport/rocket/Types.cpp
@@ -614,6 +697,7 @@ add_library(
   util/SchemaToMetadata.cpp
   util/ScopedServerInterfaceThread.cpp
   util/ScopedServerThread.cpp
+  ${THRIFTCPP2_HTTP2_SOURCES}
   ${RocketUpgrade-cpp2-SOURCES}
   ${thrift_catalog_service-cpp2-SOURCES}
 )
@@ -651,6 +735,9 @@ target_link_libraries(
     serverdbginfo
     ${Xxhash_LIBRARY}
 )
+if (THRIFT_HTTP2)
+  target_link_libraries(thriftcpp2 PUBLIC proxygen::proxygen)
+endif ()
 
 add_library(
   quic_thriftcpp2
@@ -671,6 +758,11 @@ target_link_libraries(
     mvfst::mvfst_server_async_tran
 )
 endif () # THRIFT_RPC
+
+if (THRIFT_CARBON_PROTOCOL_BENCHMARK OR
+    NOT THRIFT_MCROUTER_CARBON_CODEGEN_EXECUTABLE STREQUAL "")
+  add_subdirectory(protocol/benchmark)
+endif ()
 
 if (NOT THRIFT_LIB_ONLY)
   add_executable(

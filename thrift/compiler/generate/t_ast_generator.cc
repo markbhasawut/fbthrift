@@ -118,7 +118,7 @@ class t_ast_generator : public t_generator {
     }
     if (!protocol_set) {
       throw std::runtime_error(
-          "Missing required argument protocol=json|debug|compact");
+          "Missing required argument protocol=json|debug|compact|binary");
     }
 
     if (schema_opts_.only_root_program_ && !schema_opts_.use_hash) {
@@ -548,13 +548,24 @@ void t_ast_generator::generate_program() {
 THRIFT_REGISTER_GENERATOR(
     ast,
     "AST",
-    R"(protocol:          Which of [json|debug|compact] protocols to use for serialization.
-include_generated: Enables schematization of generated (patch) types.
-source_ranges:     Enables population of the identifier source range map.
-no_backcompat:     Disables double writes (breaking changes possible!).
-use_hash:          Uses definitionKey in typeUri and instead of extern ids.
-                   (Required for use with the SyntaxGraph API)
-root_program_only: Only schematize the root program.)");
+    R"(Serialize the compiler schema AST to gen-ast/<program>.ast.
+
+Usage: thrift1 --gen 'ast:protocol=PROTOCOL[,OPTION...]' FILE
+
+protocol=json|debug|compact|binary
+  Required wire protocol for the AST payload.
+include_generated
+  Include synthesized definitions such as generated patch types.
+source_ranges
+  Populate identifier source ranges.
+no_backcompat
+  Disable compatibility double-writes. This can make the output unreadable by older consumers.
+use_hash
+  Use definitionKey hashes in type URIs instead of external IDs.
+root_program_only
+  Emit only the root program. Requires use_hash.
+ast
+  Accepted as a compatibility no-op.)");
 
 namespace {
 std::string gen_schema(

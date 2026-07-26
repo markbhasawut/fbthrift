@@ -46,6 +46,7 @@ class t_typescript_generator : public t_whisker_generator {
 THRIFT_REGISTER_GENERATOR(
     typescript,
     "TypeScript",
-    "Experimental TypeScript support for schematization primitives only - just structs and the like, **no RPC**");
+    R"(Generate experimental TypeScript schematization primitives as <program>.ts directly below the selected output path.
+The backend does not add a gen-typescript directory, does not generate RPC, and has no options.)");
 
 } // namespace apache::thrift::compiler

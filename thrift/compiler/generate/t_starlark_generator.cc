@@ -86,7 +86,11 @@ void t_starlark_generator::generate_program() {
       /*context=*/whisker::make::map());
 }
 
-THRIFT_REGISTER_GENERATOR(starlark, "Starlark", "Starlark generator");
+THRIFT_REGISTER_GENERATOR(
+    starlark,
+    "Starlark",
+    R"(Generate restricted schema and constant definitions in gen-star/<program>.star.
+The backend supports primitives except void/binary, enums, lists, and maps. It does not generate RPC and has no options.)");
 
 } // namespace
 } // namespace apache::thrift::compiler

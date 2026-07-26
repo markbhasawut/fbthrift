@@ -667,7 +667,12 @@ void t_cpp2_patch_generator::generate_program() {
 THRIFT_REGISTER_GENERATOR(
     cpp2_patch,
     "C++ patch companion IDL",
-    "Generates gen_patch_<program>.thrift for the cpp2 patch library rule.");
+    R"(Generate the C++ patch companion IDL, traits header, and instantiation source in gen-patch.
+
+Usage: thrift1 --gen 'cpp2_patch:source_include=INCLUDE' FILE
+
+source_include=<include/path.thrift>
+  Required include operand used by the generated companion IDL. The CMake patch pipeline computes this value.)");
 
 } // namespace
 } // namespace apache::thrift::compiler

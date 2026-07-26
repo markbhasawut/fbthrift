@@ -181,6 +181,7 @@ class t_csharp_EXPERIMENTAL_generator : public t_whisker_generator {
 THRIFT_REGISTER_GENERATOR(
     csharp_EXPERIMENTAL,
     "C#",
-    "EXPERIMENTAL support for C# - use at your own risk. APIs can change without prior notice. All behavior should be considered undefined, unless explicitly specified otherwise.");
+    R"(Generate experimental C# data types and codecs in gen-csharp/<program>.cs.
+This backend does not generate RPC clients or servers and has no options. Its API is unstable.)");
 
 } // namespace apache::thrift::compiler

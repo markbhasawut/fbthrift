@@ -137,6 +137,26 @@ std::string python_generator_documentation() {
       kPythonGeneratorOptions);
 }
 
+constexpr generator_option_spec kPythonPatchGeneratorOptions[] = {
+    {
+        "use_mutable_types_for_patch",
+        "use_mutable_types_for_patch",
+        generator_option_value_policy::flag,
+        "Depend on thrift_mutable_types instead of immutable thrift_types. "
+        "This changes the Python object model consumed by the generated patch "
+        "API.",
+        "",
+    },
+};
+
+std::string python_patch_generator_documentation() {
+  return make_generator_documentation(
+      "Generate modern Python patch classes in gen-python-patch. This is a "
+      "companion to the separately generated thrift.python types.",
+      "thrift1 --gen 'python_patch[:OPTION]' FILE",
+      kPythonPatchGeneratorOptions);
+}
+
 enum class types_file_kind { not_a_types_file, source_file, type_stub };
 enum class type_kind { abstract, immutable, mutable_ };
 
@@ -1663,6 +1683,13 @@ class t_python_patch_generator : public t_mstch_python_prototypes_generator {
 
   std::string template_prefix() const override { return "patch"; }
 
+  void process_options(
+      const std::map<std::string, std::string>& options) override {
+    validate_generator_options(
+        "python_patch", options, kPythonPatchGeneratorOptions);
+    t_mstch_python_prototypes_generator::process_options(options);
+  }
+
   void generate_program() override {
     out_dir_base_ = "gen-python-patch";
     whisker::object context = whisker::make::map({
@@ -1696,11 +1723,7 @@ THRIFT_REGISTER_GENERATOR(
 
 namespace patch {
 THRIFT_REGISTER_GENERATOR(
-    python_patch,
-    "Python patch",
-    R"(use_mutable_types_for_patch:
-  Generate patch classes that depend on thrift-python mutable types
-  (thrift_mutable_types) instead of immutable types (thrift_types).)");
+    python_patch, "Python patch", python_patch_generator_documentation());
 }
 
 } // namespace apache::thrift::compiler

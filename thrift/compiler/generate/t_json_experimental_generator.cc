@@ -159,12 +159,21 @@ void t_json_experimental_generator::generate_program() {
        whisker::make::native_handle(
            render_state().prototypes->create<t_program>(*program_))},
   });
-  render_to_file(/*output_file=*/fmt::format("{}.json", program_->name()),
-                 /*template_file=*/"thrift_ast",
-                 /*context=*/context);
+  render_to_file(
+      /*output_file=*/fmt::format("{}.json", program_->name()),
+      /*template_file=*/"thrift_ast",
+      /*context=*/context);
 }
 
-THRIFT_REGISTER_GENERATOR(json_experimental, "JSON_EXPERIMENTAL", "");
+THRIFT_REGISTER_GENERATOR(
+    json_experimental,
+    "JSON_EXPERIMENTAL",
+    R"(Generate the experimental Whisker schema representation in gen-json_experimental/<program>.json.
+
+Usage: thrift1 --gen 'json_experimental[:include_prefix=PATH]' FILE
+
+include_prefix=<path>
+  Replaces an absolute source include prefix in generated source_path/include entries. It does not move output.)");
 
 } // namespace
 } // namespace apache::thrift::compiler

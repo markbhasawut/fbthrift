@@ -44,6 +44,9 @@ class t_java_deprecated_generator : public t_concat_generator {
  public:
   using t_concat_generator::t_concat_generator;
 
+  void process_options(
+      const std::map<std::string, std::string>& options) override;
+
   /**
    * Init and close methods
    */

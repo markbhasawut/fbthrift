@@ -37,6 +37,12 @@ std::string upcase_string(std::string original) {
 }
 } // namespace
 
+void t_java_deprecated_generator::process_options(
+    const std::map<std::string, std::string>& options) {
+  validate_generator_options(
+      "javadeprecated", options, std::span<const generator_option_spec>{});
+}
+
 /**
  * Prepares for file generation by opening up the necessary file output
  * streams.
@@ -4073,9 +4079,9 @@ bool t_java_deprecated_generator::has_bit_vector(const t_structured* tstruct) {
 THRIFT_REGISTER_GENERATOR(
     java_deprecated,
     "Java Deprecated",
-    R"(Generate the legacy synchronous Java API in gen-javadeprecated. The public name is javadeprecated; java_deprecated is the legacy implementation name.
+    R"(Generate the legacy synchronous FBThrift Java API in gen-javadeprecated. The public name is javadeprecated; java_deprecated is the legacy implementation name.
 
 Usage: thrift1 --gen javadeprecated FILE
-This generator has no generator options. Use namespace java for the package.)");
+This generator has no generator options. Use namespace java for the package and thrift/lib/javadeprecated as the runtime. The output is not source-compatible with the modern Reactive java backend.)");
 
 } // namespace apache::thrift::compiler

@@ -1597,6 +1597,24 @@ TEST(CompilerTest, oss_generator_aliases_and_option_validation) {
   check_compile(
       R"(
     package "facebook.com/thrift/test"
+    # expected-error@-1: Unknown javadeprecated generator option `missing`; run `thrift1 --help` for the supported options
+    namespace java com.example.test
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "javadeprecated:missing"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: Unknown android_lite generator option `missing`; run `thrift1 --help` for the supported options
+    namespace android com.example.test
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "android_lite:missing"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
     namespace py example.test
     namespace py.asyncio example.test.asyncio
     struct Foo { 1: i32 field }
@@ -1643,6 +1661,23 @@ TEST(CompilerTest, oss_generator_aliases_and_option_validation) {
     struct Foo { 1: i32 field }
 )",
       {"--gen", "python_capi:missing"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    namespace py3 example.test
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "python_patch:use_mutable_types_for_patch"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: Unknown python_patch generator option `missing`; run `thrift1 --help` for the supported options
+    namespace py3 example.test
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "python_patch:missing"});
 }
 
 TEST(CompilerTest, invalid_and_too_many_client_splits) {

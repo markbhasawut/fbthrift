@@ -5518,8 +5518,9 @@ void t_hack_generator::generate_php_struct_fields(
         throw std::runtime_error(
             tstruct->name() + "::code defined to be a non-integral type. " +
             "code fields for Exception classes must be integral");
-      } else if (const t_enum* enum_ = t->try_as<t_enum>();
-                 enum_ != nullptr && enum_->values().empty()) {
+      } else if (
+          const t_enum* enum_ = t->try_as<t_enum>();
+          enum_ != nullptr && enum_->values().empty()) {
         throw std::runtime_error(
             "Enum " + t->name() + " is the type for the code property of " +
             tstruct->name() + ", but it has no values.");
@@ -9431,31 +9432,64 @@ std::string t_hack_generator::type_to_enum(const t_type* type) {
 THRIFT_REGISTER_GENERATOR(
     hack,
     "HACK",
-    R"(server:          Generate Hack server stubs.
-rest:            Generate Hack REST processors.
-json:            Generate functions to parse JSON into thrift struct.
-mangledsvcs      Generate services with namespace mangling.
-stricttypes      Use Collection classes everywhere rather than KeyedContainer.
-arraysets        Use legacy arrays for sets rather than objects.
-                 Either legacy_arrays or hack_collections must be present.
-nonullables      Instantiate struct fields within structs, rather than nullable
-structtrait      Add 'use [StructName]Trait;' to generated classes
-shapes           Generate Shape definitions for structs
-protected_unions Generate protected members for thrift unions
-strict_unions    Only allow single set field for thrift unions
-legacy_default_values use legacy behavior for default values in nested structs
-legacy_union_json_serialization Preserve existing json serialization
-                                   for thrift unions
-shape_arraykeys  When generating Shape definition for structs:
-                    replace array<string, TValue> with array<arraykey, TValue>
-shapes_allow_unknown_fields Allow unknown fields and implicit subtyping for shapes
-frommap_construct Generate fromMap_DEPRECATED method.
-hack_collections Generate hack collections instead of hack arrays.
-const_collections Use ConstCollection objects rather than their mutable counterparts.
-typedef          Generate type aliases for all the types defined
-enum_transparenttype Use transparent typing for Hack enums: 'enum FooBar: int as int'.
-server_stream Generate service code for streaming methods'.
-split_types   Generate each type in its own file instead of one _types.php.)");
+    R"(Generate Hack types and RPC bindings in gen-hack.
+
+Usage: thrift1 --gen 'hack[:OPTION[,...]]' FILE
+
+server
+  Generate server stubs.
+json
+  Generate JSON-to-structure conversion.
+stricttypes
+  Use Collection interfaces instead of KeyedContainer.
+arraysets
+  Represent sets with legacy arrays. Requires legacy_arrays or hack_collections.
+nonullables
+  Initialize nested structure fields instead of making them nullable.
+frommap_construct
+  Generate the deprecated fromMap_DEPRECATED constructor.
+shapes
+  Generate shape definitions for structures.
+shape_arraykeys
+  Use arraykey instead of string for generated shape map keys.
+shapes_allow_unknown_fields
+  Allow unknown fields and implicit subtyping in generated shapes.
+array_migration
+  Use migration array forms for non-list containers.
+legacy_arrays
+  Generate legacy arrays; implies arraysets.
+hack_collections
+  Generate Hack collections instead of Hack arrays.
+nullable_everything
+  Make every generated field nullable.
+const_collections
+  Use ConstCollection interfaces; implies hack_collections.
+enum_extratype
+  Generate the legacy enum extra-type form.
+enum_transparenttype
+  Generate transparent Hack enum typing.
+soft_attribute
+  Emit soft type attributes on generated parameters.
+strict_unions
+  Enforce a single active union field and imply protected_unions.
+protected_unions
+  Generate protected union members.
+legacy_default_values
+  Preserve legacy defaults for nested structures.
+legacy_union_json_serialization
+  Preserve legacy union JSON serialization.
+mangledsvcs[=true|false]
+  Enable or disable service namespace mangling.
+typedef
+  Generate aliases for all defined types.
+server_stream
+  Generate streaming server code.
+skip_constants
+  Do not generate constants.
+split_types
+  Generate each type in a separate file instead of one _types.php.
+
+The historical help entries rest and structtrait are not implemented by the current generator.)");
 
 } // namespace
 } // namespace apache::thrift::compiler

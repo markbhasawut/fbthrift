@@ -61,9 +61,11 @@ constexpr generator_option_spec kJavaGeneratorOptions[] = {
 
 std::string java_generator_documentation() {
   return make_generator_documentation(
-      "Generate the modern Reactive Java runtime API in gen-java. The public "
-      "name is java; mstch_java is the legacy implementation name. Use "
-      "namespace java.swift for the generated package.",
+      "Generate the modern Reactive FBThrift Java types, clients, and services "
+      "in gen-java. The public name is java; mstch_java is the legacy "
+      "implementation name. Use namespace java.swift for the generated "
+      "package and thrift/lib/java as the runtime. The OSS Maven reactor "
+      "targets JDK 21 and 25.",
       "thrift1 --gen 'java[:OPTION[,...]]' FILE",
       kJavaGeneratorOptions);
 }

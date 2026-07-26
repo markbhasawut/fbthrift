@@ -1862,9 +1862,10 @@ void t_cocoa_generator::generate_cocoa_service_client_implementation(
       // Open recv_foo function that takes no parameters and returns the
       // declared return type
       indent(out) << "- "
-                  << function_signature(/*name=*/"recv_" + function.name(),
-                                        /*return_type=*/function.return_type(),
-                                        /*params=*/t_paramlist{})
+                  << function_signature(
+                         /*name=*/"recv_" + function.name(),
+                         /*return_type=*/function.return_type(),
+                         /*params=*/t_paramlist{})
                   << std::endl;
       scope_up(out);
 
@@ -3028,10 +3029,19 @@ std::string t_cocoa_generator::get_cocoa_property_name(const t_field* tfield) {
 THRIFT_REGISTER_GENERATOR(
     cocoa,
     "Cocoa",
-    R"(import_path=XYZ: Override thrift package import path
-log_unexpected:  Log every time an unexpected field ID or type is encountered.
-nullability:     Use annotations to ensure required fields are present.
-validate_required:
-                 Throws exception if any required field is not set.)");
+    R"(Generate legacy Objective-C types and RPC bindings in gen-cocoa.
+
+Usage: thrift1 --gen 'cocoa[:OPTION[,...]]' FILE
+
+import_path=<path>
+  Override the generated Thrift package import prefix.
+log_unexpected
+  Log unexpected field IDs or wire types while decoding.
+nullability
+  Emit Objective-C nullability annotations.
+validate_required
+  Throw when a required field is not set.
+simple_value_equality
+  Compare structure fields with Objective-C value equality instead of the legacy deep-equality helper.)");
 
 } // namespace apache::thrift::compiler

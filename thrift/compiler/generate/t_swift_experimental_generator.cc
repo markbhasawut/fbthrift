@@ -285,6 +285,7 @@ class t_swift_EXPERIMENTAL_generator : public t_whisker_generator {
 THRIFT_REGISTER_GENERATOR(
     swift_EXPERIMENTAL,
     "Swift",
-    "EXPERIMENTAL support for Swift - use at your own risk. APIs can change without prior notice. All behavior should be considered undefined, unless explicitly specified otherwise.");
+    R"(Generate experimental Swift data types and codecs in gen-swift/<program>.swift.
+The backend uses namespace swift (or derives a module from package), does not generate RPC, has no options, and has an unstable API.)");
 
 } // namespace apache::thrift::compiler

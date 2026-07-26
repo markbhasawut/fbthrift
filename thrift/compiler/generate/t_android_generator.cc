@@ -30,6 +30,12 @@ class t_android_generator : public t_java_deprecated_generator {
  public:
   using t_java_deprecated_generator::t_java_deprecated_generator;
 
+  void process_options(
+      const std::map<std::string, std::string>& options) override {
+    validate_generator_options(
+        "android_lite", options, std::span<const generator_option_spec>{});
+  }
+
   void init_generator() override;
 
   bool has_bit_vector(const t_structured*) override { return false; }
@@ -75,10 +81,10 @@ void t_android_generator::init_generator() {
 THRIFT_REGISTER_GENERATOR(
     android,
     "Android Lite Java",
-    R"(Generate the constrained legacy Java API used by thrift/lib/android_lite in gen-android. The public name is android_lite; android is the legacy implementation name.
+    R"(Generate the dependency-free constrained Java API used by thrift/lib/android_lite in gen-android. The public name is android_lite; android is the legacy implementation name.
 
 Usage: thrift1 --gen android_lite FILE
-This generator has no generator options. Use namespace android for the package.)");
+This generator has no generator options. Use namespace android for the package. Build the runtime with JDK 21 or 25; it targets Java 8 bytecode and intentionally omits the modern Netty/Reactor, server, stream, and sink surfaces.)");
 
 } // namespace
 } // namespace apache::thrift::compiler

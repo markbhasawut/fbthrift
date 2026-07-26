@@ -850,6 +850,11 @@ void t_json_generator::print_source_range(const source_range& range) {
 THRIFT_REGISTER_GENERATOR(
     json,
     "JSON",
-    "annotate:        Generate annotations in json representation");
+    R"(Generate the legacy JSON representation of the IDL in gen-json/<program>.json.
+
+Usage: thrift1 --gen 'json[:annotate]' FILE
+
+annotate
+  Include source annotations and source locations in the JSON representation.)");
 
 } // namespace apache::thrift::compiler

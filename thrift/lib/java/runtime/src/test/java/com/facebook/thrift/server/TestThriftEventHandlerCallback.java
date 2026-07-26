@@ -107,7 +107,8 @@ public class TestThriftEventHandlerCallback {
     RpcServerHandler serverHandler = initializePingRpcServerHandler(testDoneThriftEventHandler);
 
     LegacyServerTransportFactory transportFactory =
-        new LegacyServerTransportFactory(new ThriftServerConfig().setEnableJdkSsl(false));
+        new LegacyServerTransportFactory(
+            new ThriftServerConfig().setSslEnabled(false).setEnableJdkSsl(false));
     LegacyServerTransport legacyServerTransport =
         transportFactory.createServerTransport(serverHandler).block();
 
@@ -136,7 +137,8 @@ public class TestThriftEventHandlerCallback {
         new PingServiceRpcServerHandler(new BlockingPingService(), ImmutableList.of(handler));
 
     LegacyServerTransportFactory transportFactory =
-        new LegacyServerTransportFactory(new ThriftServerConfig().setEnableJdkSsl(false));
+        new LegacyServerTransportFactory(
+            new ThriftServerConfig().setSslEnabled(false).setEnableJdkSsl(false));
     LegacyServerTransport transport = transportFactory.createServerTransport(serverHandler).block();
 
     InetSocketAddress address = (InetSocketAddress) transport.getAddress();

@@ -246,7 +246,6 @@ public class RSocketThriftClientTest {
 
     for (int i = 0; i < EXHUAUST_CLIENT_CALL_THRESHOLD; i++) {
       client.ping(new PingRequest.Builder().setRequest("ping").build()).block();
-      System.out.println("Sent call " + i);
     }
   }
 
@@ -297,7 +296,6 @@ public class RSocketThriftClientTest {
     // These calls should succeed.
     for (int i = 0; i < EXHUAUST_CLIENT_CALL_THRESHOLD; i++) {
       client.ping(new PingRequest.Builder().setRequest("ping").build()).block();
-      System.out.println("Sent call " + i);
     }
   }
 

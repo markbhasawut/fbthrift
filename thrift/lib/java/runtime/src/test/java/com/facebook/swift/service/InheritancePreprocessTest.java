@@ -40,6 +40,8 @@ import io.netty.buffer.Unpooled;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 import org.apache.thrift.ProtocolId;
@@ -71,6 +73,7 @@ public class InheritancePreprocessTest {
     final AtomicInteger undeclaredUserException = new AtomicInteger();
     final AtomicInteger postWriteException = new AtomicInteger();
     final AtomicInteger done = new AtomicInteger();
+    final CountDownLatch doneLatch = new CountDownLatch(1);
     volatile TException preprocessThrow;
 
     @Override
@@ -105,6 +108,7 @@ public class InheritancePreprocessTest {
     @Override
     public void done(Object context, String methodName) {
       done.incrementAndGet();
+      doneLatch.countDown();
     }
   }
 
@@ -125,7 +129,7 @@ public class InheritancePreprocessTest {
 
     assertThat(handler.getContext.get()).as("getContext fires once").isEqualTo(1);
     assertThat(handler.preprocess.get()).as("preprocess fires once").isEqualTo(1);
-    assertThat(handler.done.get()).as("done fires once").isEqualTo(1);
+    assertDoneOnce(handler);
   }
 
   @Test
@@ -140,7 +144,7 @@ public class InheritancePreprocessTest {
 
     assertThat(handler.getContext.get()).isEqualTo(1);
     assertThat(handler.preprocess.get()).isEqualTo(1);
-    assertThat(handler.done.get()).isEqualTo(1);
+    assertDoneOnce(handler);
   }
 
   // ---------------------------------------------------------------------------
@@ -159,7 +163,7 @@ public class InheritancePreprocessTest {
     rpc.singleRequestSingleResponse(payload("ping")).block();
 
     assertThat(handler.preprocess.get()).isEqualTo(1);
-    assertThat(handler.done.get()).isEqualTo(1);
+    assertDoneOnce(handler);
   }
 
   @Test
@@ -182,7 +186,7 @@ public class InheritancePreprocessTest {
         .isEqualTo(1);
     assertThat(handler.undeclaredUserException.get()).isEqualTo(1);
     assertThat(handler.postWriteException.get()).isEqualTo(1);
-    assertThat(handler.done.get()).isEqualTo(1);
+    assertDoneOnce(handler);
   }
 
   @Test
@@ -209,7 +213,7 @@ public class InheritancePreprocessTest {
         .isEqualTo(1);
     assertThat(handler.undeclaredUserException.get()).isEqualTo(1);
     assertThat(handler.postWriteException.get()).isEqualTo(1);
-    assertThat(handler.done.get()).isEqualTo(1);
+    assertDoneOnce(handler);
   }
 
   /** Simulates the transport serializing the response payload, which is what fires write hooks. */
@@ -260,12 +264,24 @@ public class InheritancePreprocessTest {
     rpc.singleRequestSingleResponse(payload("ping")).block();
 
     assertThat(handler.preprocess.get()).isEqualTo(1);
-    assertThat(handler.done.get()).as("done MUST fire even when user handler throws").isEqualTo(1);
+    assertDoneOnce(handler);
   }
 
   // ---------------------------------------------------------------------------
   // helpers
   // ---------------------------------------------------------------------------
+
+  private static void assertDoneOnce(Counting handler) {
+    try {
+      assertThat(handler.doneLatch.await(5, TimeUnit.SECONDS))
+          .as("done MUST fire after reactive teardown")
+          .isTrue();
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      throw new AssertionError("interrupted while waiting for done()", e);
+    }
+    assertThat(handler.done.get()).as("done MUST fire exactly once").isEqualTo(1);
+  }
 
   private static ServerRequestPayload payload(String method) {
     Function<List<Reader>, List<Object>> readerTransformer =

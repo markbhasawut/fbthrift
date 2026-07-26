@@ -29,7 +29,6 @@ import java.time.Duration;
 import java.util.Objects;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ThreadLocalRandom;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Assertions;
@@ -154,17 +153,8 @@ public class ReactorNettyTransportTest {
 
   @Test
   public void requestChannel20_000() {
-    AtomicInteger sent = new AtomicInteger();
-
     Flux<Payload> payloads =
-        Flux.range(0, 20_000)
-            .map(metadataPresent -> createTestPayload(7))
-            .doOnNext(
-                payload -> {
-                  if (sent.getAndIncrement() % 1_000 == 0) {
-                    System.out.println("sent count -> " + sent);
-                  }
-                });
+        Flux.range(0, 20_000).map(metadataPresent -> createTestPayload(7));
 
     getClient()
         .requestChannel(payloads)

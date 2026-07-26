@@ -38,6 +38,7 @@ import io.netty.buffer.ByteBufAllocator;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.Channel;
 import io.netty.channel.ChannelPipeline;
+import io.netty.util.ReferenceCountUtil;
 import io.netty.util.ResourceLeakDetector;
 import java.net.InetSocketAddress;
 import java.util.Collections;
@@ -48,11 +49,14 @@ import org.apache.thrift.TApplicationException;
 import org.apache.thrift.protocol.TMessage;
 import org.apache.thrift.protocol.TMessageType;
 import org.apache.thrift.protocol.TProtocol;
+import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Mockito;
+import org.mockito.invocation.Invocation;
 import reactor.core.publisher.Mono;
 import reactor.core.scheduler.Schedulers;
 import reactor.netty.ByteBufFlux;
@@ -63,6 +67,8 @@ import reactor.test.StepVerifier;
 import reactor.test.publisher.TestPublisher;
 
 public class ThriftConnectionAcceptorTest {
+  private static ResourceLeakDetector.Level previousLeakDetectorLevel;
+
   private RpcServerHandler mockRpcServerHandler;
   private Connection mockConnection;
   private NettyInbound mockInbound;
@@ -75,7 +81,13 @@ public class ThriftConnectionAcceptorTest {
 
   @BeforeAll
   public static void setupClass() {
+    previousLeakDetectorLevel = ResourceLeakDetector.getLevel();
     ResourceLeakDetector.setLevel(ResourceLeakDetector.Level.PARANOID);
+  }
+
+  @AfterAll
+  public static void tearDownClass() {
+    ResourceLeakDetector.setLevel(previousLeakDetectorLevel);
   }
 
   @BeforeEach
@@ -109,7 +121,16 @@ public class ThriftConnectionAcceptorTest {
 
   @AfterEach
   public void tearDown() {
-    // PARANOID leak detection is enabled — leaks are detected via GC-triggered tracking
+    // Reactor Netty takes ownership of objects passed to sendObject(). The mock transport cannot
+    // perform that release, so model it explicitly after each test.
+    for (Invocation invocation : Mockito.mockingDetails(mockOutbound).getInvocations()) {
+      if (invocation.getMethod().getName().equals("sendObject")) {
+        Object message = invocation.getArgument(0);
+        if (ReferenceCountUtil.refCnt(message) > 0) {
+          ReferenceCountUtil.safeRelease(message);
+        }
+      }
+    }
   }
 
   /** Helper to create an encoded request ByteBuf ready for the inbound pipeline. */
@@ -183,7 +204,7 @@ public class ThriftConnectionAcceptorTest {
 
     // Verify the pipeline
     StepVerifier.create(result)
-        .then(() -> inboundPublisher.next(encodedRequest.retain()))
+        .then(() -> inboundPublisher.next(encodedRequest))
         .then(
             () -> {
               // Verify outbound.sendObject() was called
@@ -244,7 +265,7 @@ public class ThriftConnectionAcceptorTest {
 
     // Verify
     StepVerifier.create(result)
-        .then(() -> inboundPublisher.next(encodedRequest.retain()))
+        .then(() -> inboundPublisher.next(encodedRequest))
         .then(
             () -> {
               // Verify singleRequestNoResponse was called
@@ -294,7 +315,7 @@ public class ThriftConnectionAcceptorTest {
 
     // Verify
     StepVerifier.create(result)
-        .then(() -> inboundPublisher.next(encodedRequest.retain()))
+        .then(() -> inboundPublisher.next(encodedRequest))
         .then(
             () -> {
               // Verify loadshedding exception was sent
@@ -376,7 +397,7 @@ public class ThriftConnectionAcceptorTest {
 
     // Verify normal processing (since we can't easily create unsupported RpcKind in test)
     StepVerifier.create(result)
-        .then(() -> inboundPublisher.next(encodedRequest.retain()))
+        .then(() -> inboundPublisher.next(encodedRequest))
         .then(
             () ->
                 verify(mockRpcServerHandler)
@@ -426,8 +447,8 @@ public class ThriftConnectionAcceptorTest {
 
     // Verify multiple request processing
     StepVerifier.create(result)
-        .then(() -> inboundPublisher.next(encodedRequest1.retain()))
-        .then(() -> inboundPublisher.next(encodedRequest2.retain()))
+        .then(() -> inboundPublisher.next(encodedRequest1))
+        .then(() -> inboundPublisher.next(encodedRequest2))
         .then(
             () -> {
               // Verify both requests were processed
@@ -480,7 +501,7 @@ public class ThriftConnectionAcceptorTest {
 
     // Verify the stream continues (error is handled internally) and connection is disposed
     StepVerifier.create(result)
-        .then(() -> inboundPublisher.next(encodedRequest.retain()))
+        .then(() -> inboundPublisher.next(encodedRequest))
         .then(
             () -> {
               // handleException calls conn.dispose() for non-RejectedExecutionException
@@ -517,7 +538,7 @@ public class ThriftConnectionAcceptorTest {
 
     // Verify the stream continues without error (catch block handles the decode failure)
     StepVerifier.create(result)
-        .then(() -> inboundPublisher.next(malformedRequest.retain()))
+        .then(() -> inboundPublisher.next(malformedRequest))
         .then(
             () -> {
               // No response should be sent for a decode failure
@@ -583,8 +604,8 @@ public class ThriftConnectionAcceptorTest {
     acceptor.apply(mockConnection).subscribe();
 
     // Emit both requests
-    inboundPublisher.next(encodedRequest1.retain());
-    inboundPublisher.next(encodedRequest2.retain());
+    inboundPublisher.next(encodedRequest1);
+    inboundPublisher.next(encodedRequest2);
 
     // Both handlers should start concurrently (would timeout with concatMap)
     assertTrue(bothStarted.await(5, TimeUnit.SECONDS), "Both handlers should start concurrently");

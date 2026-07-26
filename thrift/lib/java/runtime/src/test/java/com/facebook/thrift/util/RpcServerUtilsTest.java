@@ -32,6 +32,7 @@ import com.facebook.nifty.ssl.SslSession;
 import com.facebook.swift.service.SwiftConstants;
 import com.facebook.swift.service.ThriftServerConfig;
 import com.facebook.thrift.legacy.server.ThriftOptionalSslHandler;
+import com.facebook.thrift.transport.unified.TestCertificateUtil;
 import com.facebook.thrift.util.resources.RpcResources;
 import com.google.common.collect.ImmutableMap;
 import io.netty.channel.epoll.EpollServerDomainSocketChannel;
@@ -48,6 +49,8 @@ import io.netty.util.internal.PlatformDependent;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import org.mockito.Mockito;
@@ -56,6 +59,16 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 public class RpcServerUtilsTest {
+
+  @BeforeAll
+  public static void initializeCertificates() throws Exception {
+    TestCertificateUtil.initialize();
+  }
+
+  @AfterAll
+  public static void cleanupCertificates() {
+    TestCertificateUtil.cleanup();
+  }
 
   @Test
   public void testGetEventLoopGroup() {
@@ -167,21 +180,19 @@ public class RpcServerUtilsTest {
   // TODO(yuhanhao) need NettyTcNativeLoader
   @Test
   public void tesSslContext() {
-    SslContext context = RpcServerUtils.getSslContext(new ThriftServerConfig());
+    SslContext context = RpcServerUtils.getSslContext(createSslConfig(false));
     assertTrue(context.isServer());
   }
 
   @Test
   public void tesJdkSslContext() {
-    SslContext context =
-        RpcServerUtils.getSslContext(new ThriftServerConfig().setEnableJdkSsl(true));
+    SslContext context = RpcServerUtils.getSslContext(createSslConfig(true));
     assertTrue(context.isServer());
   }
 
   @Test
   public void testSslAttribute() {
-    SslContext context =
-        RpcServerUtils.getSslContext(new ThriftServerConfig().setEnableJdkSsl(true));
+    SslContext context = RpcServerUtils.getSslContext(createSslConfig(true));
     // This will create sslSession
     ThriftOptionalSslHandler optionalSslHandler = new ThriftOptionalSslHandler(context);
     // This should re-use sslSession
@@ -226,5 +237,13 @@ public class RpcServerUtilsTest {
 
   private static boolean isMacos() {
     return System.getProperty("os.name").startsWith("Mac");
+  }
+
+  private static ThriftServerConfig createSslConfig(boolean enableJdkSsl) {
+    return new ThriftServerConfig()
+        .setEnableJdkSsl(enableJdkSsl)
+        .setKeyFile(TestCertificateUtil.getKeyFilePath())
+        .setCertFile(TestCertificateUtil.getCertFilePath())
+        .setCAFile(TestCertificateUtil.getCAFilePath());
   }
 }

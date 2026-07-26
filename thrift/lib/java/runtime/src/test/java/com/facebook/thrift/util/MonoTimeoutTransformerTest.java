@@ -729,24 +729,23 @@ public class MonoTimeoutTransformerTest {
 
   @Test
   public void testLateSourceSignalAfterTimeout() {
-    // Source that tries to emit after timeout
     Sinks.One<String> sink = Sinks.one();
+    ControllableTimer timer = new ControllableTimer();
 
     Mono<String> transform =
         sink.asMono()
             .transform(
                 new MonoTimeoutTransformer<>(
-                    RpcResources.getClientOffLoopScheduler(), 50, TimeUnit.MILLISECONDS));
+                    Schedulers.immediate(),
+                    1,
+                    TimeUnit.HOURS,
+                    null,
+                    () -> timer));
 
     StepVerifier.create(transform)
         .then(
             () -> {
-              // Emit after timeout should have fired
-              try {
-                Thread.sleep(100);
-              } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-              }
+              timer.fireAllTimeouts();
               sink.tryEmitValue("late");
             })
         .verifyError(TimeoutException.class);

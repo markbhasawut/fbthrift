@@ -61,7 +61,8 @@ public class SimpleThriftClientTest {
 
     System.out.println("starting server");
     LegacyServerTransportFactory transportFactory =
-        new LegacyServerTransportFactory(new ThriftServerConfig().setEnableJdkSsl(false));
+        new LegacyServerTransportFactory(
+            new ThriftServerConfig().setSslEnabled(false).setEnableJdkSsl(false));
     LegacyServerTransport transport = transportFactory.createServerTransport(serverHandler).block();
     InetSocketAddress address = (InetSocketAddress) transport.getAddress();
 
@@ -90,7 +91,8 @@ public class SimpleThriftClientTest {
 
     System.out.println("starting server");
     LegacyServerTransportFactory transportFactory =
-        new LegacyServerTransportFactory(new ThriftServerConfig().setEnableJdkSsl(false));
+        new LegacyServerTransportFactory(
+            new ThriftServerConfig().setSslEnabled(false).setEnableJdkSsl(false));
     LegacyServerTransport transport = transportFactory.createServerTransport(serverHandler).block();
     InetSocketAddress address = (InetSocketAddress) transport.getAddress();
 
@@ -128,7 +130,8 @@ public class SimpleThriftClientTest {
 
     System.out.println("starting server");
     LegacyServerTransportFactory transportFactory =
-        new LegacyServerTransportFactory(new ThriftServerConfig().setEnableJdkSsl(false));
+        new LegacyServerTransportFactory(
+            new ThriftServerConfig().setSslEnabled(false).setEnableJdkSsl(false));
     LegacyServerTransport transport = transportFactory.createServerTransport(serverHandler).block();
     InetSocketAddress address = (InetSocketAddress) transport.getAddress();
 
@@ -161,7 +164,8 @@ public class SimpleThriftClientTest {
 
     System.out.println("starting server");
     LegacyServerTransportFactory transportFactory =
-        new LegacyServerTransportFactory(new ThriftServerConfig().setEnableJdkSsl(false));
+        new LegacyServerTransportFactory(
+            new ThriftServerConfig().setSslEnabled(false).setEnableJdkSsl(false));
     LegacyServerTransport transport = transportFactory.createServerTransport(serverHandler).block();
     InetSocketAddress address = (InetSocketAddress) transport.getAddress();
 
@@ -191,7 +195,8 @@ public class SimpleThriftClientTest {
 
     System.out.println("starting server");
     LegacyServerTransportFactory transportFactory =
-        new LegacyServerTransportFactory(new ThriftServerConfig().setEnableJdkSsl(false));
+        new LegacyServerTransportFactory(
+            new ThriftServerConfig().setSslEnabled(false).setEnableJdkSsl(false));
     LegacyServerTransport transport = transportFactory.createServerTransport(serverHandler).block();
     InetSocketAddress address = (InetSocketAddress) transport.getAddress();
 
@@ -221,7 +226,8 @@ public class SimpleThriftClientTest {
 
     System.out.println("starting server");
     LegacyServerTransportFactory transportFactory =
-        new LegacyServerTransportFactory(new ThriftServerConfig().setEnableJdkSsl(false));
+        new LegacyServerTransportFactory(
+            new ThriftServerConfig().setSslEnabled(false).setEnableJdkSsl(false));
     LegacyServerTransport transport = transportFactory.createServerTransport(serverHandler).block();
     InetSocketAddress address = (InetSocketAddress) transport.getAddress();
     SPINiftyMetrics metrics = transport.getNiftyMetrics();
@@ -269,7 +275,8 @@ public class SimpleThriftClientTest {
 
     System.out.println("starting server");
     LegacyServerTransportFactory transportFactory =
-        new LegacyServerTransportFactory(new ThriftServerConfig().setEnableJdkSsl(false));
+        new LegacyServerTransportFactory(
+            new ThriftServerConfig().setSslEnabled(false).setEnableJdkSsl(false));
     LegacyServerTransport transport = transportFactory.createServerTransport(serverHandler).block();
     InetSocketAddress address = (InetSocketAddress) transport.getAddress();
 
@@ -321,7 +328,8 @@ public class SimpleThriftClientTest {
 
     System.out.println("starting server");
     LegacyServerTransportFactory transportFactory =
-        new LegacyServerTransportFactory(new ThriftServerConfig().setEnableJdkSsl(false));
+        new LegacyServerTransportFactory(
+            new ThriftServerConfig().setSslEnabled(false).setEnableJdkSsl(false));
     LegacyServerTransport transport = transportFactory.createServerTransport(serverHandler).block();
     InetSocketAddress address = (InetSocketAddress) transport.getAddress();
 
@@ -378,7 +386,8 @@ public class SimpleThriftClientTest {
 
     System.out.println("starting server");
     LegacyServerTransportFactory transportFactory =
-        new LegacyServerTransportFactory(new ThriftServerConfig().setEnableJdkSsl(false));
+        new LegacyServerTransportFactory(
+            new ThriftServerConfig().setSslEnabled(false).setEnableJdkSsl(false));
     LegacyServerTransport transport = transportFactory.createServerTransport(serverHandler).block();
     InetSocketAddress address = (InetSocketAddress) transport.getAddress();
 

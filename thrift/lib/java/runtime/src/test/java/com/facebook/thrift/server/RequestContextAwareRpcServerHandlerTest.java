@@ -59,7 +59,8 @@ public class RequestContextAwareRpcServerHandlerTest {
 
     System.out.println("starting server");
     LegacyServerTransportFactory transportFactory =
-        new LegacyServerTransportFactory(new ThriftServerConfig().setEnableJdkSsl(false));
+        new LegacyServerTransportFactory(
+            new ThriftServerConfig().setSslEnabled(false).setEnableJdkSsl(false));
     LegacyServerTransport transport = transportFactory.createServerTransport(serverHandler).block();
     InetSocketAddress address = (InetSocketAddress) transport.getAddress();
 
@@ -103,7 +104,8 @@ public class RequestContextAwareRpcServerHandlerTest {
 
     System.out.println("starting server");
     LegacyServerTransportFactory transportFactory =
-        new LegacyServerTransportFactory(new ThriftServerConfig().setEnableJdkSsl(false));
+        new LegacyServerTransportFactory(
+            new ThriftServerConfig().setSslEnabled(false).setEnableJdkSsl(false));
     LegacyServerTransport transport = transportFactory.createServerTransport(serverHandler).block();
     InetSocketAddress address = (InetSocketAddress) transport.getAddress();
 
@@ -151,7 +153,8 @@ public class RequestContextAwareRpcServerHandlerTest {
 
     System.out.println("starting server");
     LegacyServerTransportFactory transportFactory =
-        new LegacyServerTransportFactory(new ThriftServerConfig().setEnableJdkSsl(false));
+        new LegacyServerTransportFactory(
+            new ThriftServerConfig().setSslEnabled(false).setEnableJdkSsl(false));
     LegacyServerTransport transport = transportFactory.createServerTransport(serverHandler).block();
     InetSocketAddress address = (InetSocketAddress) transport.getAddress();
 

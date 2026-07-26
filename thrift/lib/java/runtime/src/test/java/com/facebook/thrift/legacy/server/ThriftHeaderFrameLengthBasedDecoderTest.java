@@ -23,6 +23,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.embedded.EmbeddedChannel;
 import io.netty.handler.codec.TooLongFrameException;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.Tag;
 import org.junit.jupiter.api.Test;
 
 public class ThriftHeaderFrameLengthBasedDecoderTest {
@@ -54,6 +55,7 @@ public class ThriftHeaderFrameLengthBasedDecoderTest {
   }
 
   @Test
+  @Tag("large-memory")
   public void testNormalFrameMaxSizePayload() {
     // Max Size + Length Field
     int frameLength = 0x3FFFFFFF;
@@ -81,6 +83,7 @@ public class ThriftHeaderFrameLengthBasedDecoderTest {
   }
 
   @Test
+  @Tag("large-memory")
   public void testNormalFrameOverSizePayloadFails() {
     Assertions.assertThrows(
         TooLongFrameException.class,
@@ -99,6 +102,7 @@ public class ThriftHeaderFrameLengthBasedDecoderTest {
   }
 
   @Test
+  @Tag("large-memory")
   public void testBigFrameOverSizedPayloadSucceeds() {
     int frameLength = Integer.MAX_VALUE - 1024;
     ByteBuf buf = Unpooled.buffer(frameLength + 12);
@@ -197,6 +201,7 @@ public class ThriftHeaderFrameLengthBasedDecoderTest {
   }
 
   @Test
+  @Tag("large-memory")
   public void testMultipleBigFrames() {
     // Test multiple big frames to ensure proper handling of 12-byte length field
     EmbeddedChannel channel = new EmbeddedChannel(new ThriftHeaderFrameLengthBasedDecoder());
@@ -233,6 +238,7 @@ public class ThriftHeaderFrameLengthBasedDecoderTest {
   }
 
   @Test
+  @Tag("large-memory")
   public void testMixedNormalAndBigFrames() {
     // Test alternating between normal and big frames
     EmbeddedChannel channel = new EmbeddedChannel(new ThriftHeaderFrameLengthBasedDecoder());

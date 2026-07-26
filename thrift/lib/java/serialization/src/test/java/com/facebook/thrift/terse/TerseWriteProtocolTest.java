@@ -49,6 +49,7 @@ import io.netty.buffer.Unpooled;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.stream.Stream;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
@@ -69,6 +70,15 @@ public class TerseWriteProtocolTest {
   private ByteBuf dest;
   private ByteBufTProtocol protocol;
 
+  @AfterEach
+  public void releaseDestinationBuffer() {
+    if (dest != null) {
+      dest.release();
+      dest = null;
+      protocol = null;
+    }
+  }
+
   private ByteBufTProtocol createNewProtocol() {
     return SerializerUtil.toByteBufProtocol(serializationProtocol, dest);
   }
@@ -80,10 +90,15 @@ public class TerseWriteProtocolTest {
   }
 
   private int size(ThriftSerializable t) {
-    dest = ByteBufAllocator.DEFAULT.buffer();
-    protocol = SerializerUtil.toByteBufProtocol(serializationProtocol, dest);
-    t.write0(protocol);
-    return dest.readableBytes();
+    ByteBuf buffer = ByteBufAllocator.DEFAULT.buffer();
+    try {
+      ByteBufTProtocol sizeProtocol =
+          SerializerUtil.toByteBufProtocol(serializationProtocol, buffer);
+      t.write0(sizeProtocol);
+      return buffer.readableBytes();
+    } finally {
+      buffer.release();
+    }
   }
 
   private boolean protocolNotSupported() {

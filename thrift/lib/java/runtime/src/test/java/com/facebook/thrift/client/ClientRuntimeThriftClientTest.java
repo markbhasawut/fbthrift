@@ -35,6 +35,7 @@ import com.facebook.thrift.legacy.server.testservices.BlockingPingService;
 import com.facebook.thrift.rsocket.server.RSocketServerTransportFactory;
 import com.facebook.thrift.server.RpcServerHandler;
 import com.facebook.thrift.server.ServerTransport;
+import com.facebook.thrift.transport.unified.TestCertificateUtil;
 import com.facebook.thrift.util.RpcServerUtils;
 import com.facebook.thrift.util.TransportType;
 import io.airlift.units.Duration;
@@ -44,6 +45,8 @@ import java.util.Collections;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import org.apache.thrift.ProtocolId;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Timeout;
 import reactor.core.publisher.Flux;
@@ -51,6 +54,16 @@ import reactor.core.publisher.Mono;
 import reactor.test.StepVerifier;
 
 public class ClientRuntimeThriftClientTest {
+
+  @BeforeAll
+  public static void initializeCertificateFixture() throws Exception {
+    TestCertificateUtil.initialize();
+  }
+
+  @AfterAll
+  public static void cleanupCertificateFixture() {
+    TestCertificateUtil.cleanup();
+  }
 
   @Test
   @Timeout(30)
@@ -372,6 +385,9 @@ public class ClientRuntimeThriftClientTest {
     return new ThriftClientConfig()
         .setDisableSSL(false)
         .setEnableJdkSsl(false)
+        .setKeyFile(TestCertificateUtil.getKeyFilePath())
+        .setCertFile(TestCertificateUtil.getCertFilePath())
+        .setCAFile(TestCertificateUtil.getCAFilePath())
         .setRequestTimeout(Duration.succinctDuration(1, TimeUnit.DAYS));
   }
 
@@ -390,7 +406,12 @@ public class ClientRuntimeThriftClientTest {
   private static ServerTransport createRSocketServer(RpcServerHandler serverHandler) {
     // RSocket SSL currently assumes a dedicated listener; ALPN negotiation lands separately.
     return new RSocketServerTransportFactory(
-            new ThriftServerConfig().setSslEnabled(true).setEnableJdkSsl(false))
+            new ThriftServerConfig()
+                .setSslEnabled(true)
+                .setEnableJdkSsl(false)
+                .setKeyFile(TestCertificateUtil.getKeyFilePath())
+                .setCertFile(TestCertificateUtil.getCertFilePath())
+                .setCAFile(TestCertificateUtil.getCAFilePath()))
         .createServerTransport(serverHandler)
         .block();
   }

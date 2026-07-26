@@ -50,7 +50,10 @@ public class TestServerDecoder {
         new PingServiceRpcServerHandler(new BlockingPingService(), Collections.emptyList());
 
     ThriftServerConfig serverConfig =
-        new ThriftServerConfig().setMaxFrameSize(maxFrameSize).setEnableJdkSsl(false);
+        new ThriftServerConfig()
+            .setMaxFrameSize(maxFrameSize)
+            .setSslEnabled(false)
+            .setEnableJdkSsl(false);
 
     LegacyServerTransportFactory transportFactory = new LegacyServerTransportFactory(serverConfig);
     LegacyServerTransport transport = transportFactory.createServerTransport(serverHandler).block();
@@ -101,7 +104,10 @@ public class TestServerDecoder {
         new PingServiceRpcServerHandler(new BlockingPingService(), Collections.emptyList());
     LegacyServerTransportFactory transportFactory =
         new LegacyServerTransportFactory(
-            new ThriftServerConfig().setMaxFrameSize(maxFrameSize).setEnableJdkSsl(false));
+            new ThriftServerConfig()
+                .setMaxFrameSize(maxFrameSize)
+                .setSslEnabled(false)
+                .setEnableJdkSsl(false));
     LegacyServerTransport transport = transportFactory.createServerTransport(serverHandler).block();
     InetSocketAddress address = (InetSocketAddress) transport.getAddress();
 
@@ -134,7 +140,10 @@ public class TestServerDecoder {
         new PingServiceRpcServerHandler(new BlockingPingService(), Collections.emptyList());
 
     ThriftServerConfig serverConfig =
-        new ThriftServerConfig().setMaxFrameSize(maxFrameSize).setEnableJdkSsl(false);
+        new ThriftServerConfig()
+            .setMaxFrameSize(maxFrameSize)
+            .setSslEnabled(false)
+            .setEnableJdkSsl(false);
 
     LegacyServerTransportFactory transportFactory = new LegacyServerTransportFactory(serverConfig);
     LegacyServerTransport transport = transportFactory.createServerTransport(serverHandler).block();

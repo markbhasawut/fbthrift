@@ -73,8 +73,6 @@ public class ThriftServerRSocketTest {
     ByteBuf buf = alloc.buffer();
     TProtocol protocol = TProtocolType.fromProtocolId(ProtocolId.COMPACT).apply(buf);
     metadata.write0(protocol);
-    buf.retain();
-
     return buf;
   }
 
@@ -87,8 +85,6 @@ public class ThriftServerRSocketTest {
     protocol.writeFieldEnd();
     protocol.writeFieldStop();
     protocol.writeStructEnd();
-    buf.retain();
-
     return buf;
   }
 
@@ -108,8 +104,6 @@ public class ThriftServerRSocketTest {
 
     protocol.writeFieldStop();
     protocol.writeStructEnd();
-    buf.retain();
-
     return buf;
   }
 

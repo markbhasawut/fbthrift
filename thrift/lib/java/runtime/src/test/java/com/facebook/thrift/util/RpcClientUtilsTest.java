@@ -38,6 +38,7 @@ import com.facebook.thrift.payload.ClientResponsePayload;
 import com.facebook.thrift.payload.Reader;
 import com.facebook.thrift.protocol.ByteBufTProtocol;
 import com.facebook.thrift.protocol.TProtocolType;
+import com.facebook.thrift.transport.unified.TestCertificateUtil;
 import com.facebook.thrift.util.resources.RpcResources;
 import com.google.common.collect.ImmutableMap;
 import io.netty.buffer.Unpooled;
@@ -73,11 +74,23 @@ import org.apache.thrift.protocol.TField;
 import org.apache.thrift.protocol.TStruct;
 import org.apache.thrift.protocol.TType;
 import org.apache.thrift.transport.TTransportException;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.mockito.MockedStatic;
 import reactor.core.Exceptions;
 
 public class RpcClientUtilsTest {
+
+  @BeforeAll
+  public static void initializeCertificates() throws Exception {
+    TestCertificateUtil.initialize();
+  }
+
+  @AfterAll
+  public static void cleanupCertificates() {
+    TestCertificateUtil.cleanup();
+  }
 
   private final Reader<PingResponse> reader =
       (oprot) -> {
@@ -228,15 +241,14 @@ public class RpcClientUtilsTest {
   @Test
   public void tesSslContext() {
     SslContext context =
-        RpcClientUtils.getSslContext(new ThriftClientConfig(), new InetSocketAddress(0));
+        RpcClientUtils.getSslContext(createSslConfig(false), new InetSocketAddress(0));
     assertTrue(context.isClient());
   }
 
   @Test
   public void tesJdkSslContext() {
     SslContext context =
-        RpcClientUtils.getSslContext(
-            new ThriftClientConfig().setEnableJdkSsl(true), new InetSocketAddress(0));
+        RpcClientUtils.getSslContext(createSslConfig(true), new InetSocketAddress(0));
     assertTrue(context.isClient());
   }
 
@@ -478,5 +490,13 @@ public class RpcClientUtilsTest {
 
   private static boolean isMacos() {
     return System.getProperty("os.name").startsWith("Mac");
+  }
+
+  private static ThriftClientConfig createSslConfig(boolean enableJdkSsl) {
+    return new ThriftClientConfig()
+        .setEnableJdkSsl(enableJdkSsl)
+        .setKeyFile(TestCertificateUtil.getKeyFilePath())
+        .setCertFile(TestCertificateUtil.getCertFilePath())
+        .setCAFile(TestCertificateUtil.getCAFilePath());
   }
 }

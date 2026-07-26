@@ -92,6 +92,17 @@ public class ThriftAnyStandardProtocolTest {
 
   @ParameterizedTest
   @MethodSource("data")
+  public void serializedPayloadUsesGcOwnedHeapStorage(StandardProtocol standardProtocol) {
+    this.standardProtocol = standardProtocol;
+
+    ByteBuf data = createAny("payload").getAny().getData();
+
+    assertFalse(data.isDirect());
+    assertTrue(data.hasArray());
+  }
+
+  @ParameterizedTest
+  @MethodSource("data")
   public void testBool(StandardProtocol standardProtocol) {
     this.standardProtocol = standardProtocol;
     Any<Boolean> any = createAny(true);

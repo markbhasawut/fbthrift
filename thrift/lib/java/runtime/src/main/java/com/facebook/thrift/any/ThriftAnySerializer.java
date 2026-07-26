@@ -33,6 +33,8 @@ import com.facebook.thrift.util.SerializationProtocolUtil;
 import com.facebook.thrift.util.SerializerUtil;
 import com.facebook.thrift.util.resources.RpcResources;
 import io.netty.buffer.ByteBuf;
+import io.netty.buffer.ByteBufUtil;
+import io.netty.buffer.Unpooled;
 import java.lang.annotation.Annotation;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -448,12 +450,24 @@ public class ThriftAnySerializer {
       }
 
       if (builder.standardProtocol != null) {
-        // buffer = RpcResources.getUnpooledByteBufAllocator().buffer(1024, 1 << 24);
-        buffer = RpcResources.getByteBufAllocator().buffer(1024, 1 << 24);
-        protocol =
-            SerializerUtil.toByteBufProtocol(
-                SerializationProtocolUtil.getProtocol(builder.standardProtocol), buffer);
-        serializeObject(o, 0);
+        ByteBuf serializationBuffer =
+            RpcResources.getUnpooledByteBufAllocator().heapBuffer(1024, 1 << 24);
+        try {
+          buffer = serializationBuffer;
+          protocol =
+              SerializerUtil.toByteBufProtocol(
+                  SerializationProtocolUtil.getProtocol(builder.standardProtocol), buffer);
+          serializeObject(o, 0);
+          buffer =
+              Unpooled.wrappedBuffer(
+                  ByteBufUtil.getBytes(
+                      serializationBuffer,
+                      serializationBuffer.readerIndex(),
+                      serializationBuffer.readableBytes(),
+                      false));
+        } finally {
+          serializationBuffer.release();
+        }
       } else if (builder.customProtocolUri != null) {
         serializeObject(o, builder.customProtocolUri);
       } else if (builder.customProtocolId != null) {

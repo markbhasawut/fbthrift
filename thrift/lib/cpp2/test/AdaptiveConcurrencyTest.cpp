@@ -125,7 +125,7 @@ class AdaptiveConcurrencyBase : public testing::Test {
 
     for (int i = 0; i < count; i++) {
       EXPECT_GT(p(controller).samplingPeriodStart(), Clock::time_point{});
-      EXPECT_LT(p(controller).samplingPeriodStart(), Clock::now());
+      EXPECT_LE(p(controller).samplingPeriodStart(), Clock::now());
       makeRequest(latency);
     }
 
@@ -136,7 +136,7 @@ class AdaptiveConcurrencyBase : public testing::Test {
         break;
       case EndState::SamplingScheduled:
         EXPECT_GT(p(controller).samplingPeriodStart(), before + 500ms);
-        EXPECT_LT(p(controller).samplingPeriodStart(), Clock::now() + 500ms);
+        EXPECT_LE(p(controller).samplingPeriodStart(), Clock::now() + 500ms);
         break;
     }
   }
@@ -397,7 +397,7 @@ TEST_P(TargetRttPercentileTestP, TargetRttPercentileTest) {
   {
     auto now = Clock::now();
     makeRequest();
-    EXPECT_GT(p(controller).samplingPeriodStart(), now);
+    EXPECT_GE(p(controller).samplingPeriodStart(), now);
   }
 
   p(controller).samplingPeriodStart(Clock::now());

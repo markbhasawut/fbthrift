@@ -18,7 +18,7 @@
 // defined to something problematic.
 #define conflicting_name 0
 
-#include <folly/test/JsonTestUtil.h>
+#include <folly/json/JsonTestUtil.h>
 #include <thrift/lib/cpp/util/EnumUtils.h>
 #include <thrift/lib/cpp2/protocol/Serializer.h>
 #include <thrift/lib/cpp2/util/ScopedServerInterfaceThread.h>

@@ -31,9 +31,15 @@ using namespace apache::thrift::test;
 
 class Handler : public apache::thrift::ServiceHandler<MyLeaf> {
  public:
-  Future<string> future_doRoot() override { return makeFuture(string("root")); }
-  Future<string> future_doNode() override { return makeFuture(string("node")); }
-  Future<string> future_doLeaf() override { return makeFuture(string("leaf")); }
+  Future<unique_ptr<string>> future_doRoot() override {
+    return makeFuture(make_unique<string>("root"));
+  }
+  Future<unique_ptr<string>> future_doNode() override {
+    return makeFuture(make_unique<string>("node"));
+  }
+  Future<unique_ptr<string>> future_doLeaf() override {
+    return makeFuture(make_unique<string>("leaf"));
+  }
 };
 
 class ThriftServerInheritanceTest : public testing::Test {};

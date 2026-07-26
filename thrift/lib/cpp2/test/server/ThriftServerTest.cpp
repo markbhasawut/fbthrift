@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <barrier>
 #include <chrono>
 #include <memory>
 #include <stdexcept>
@@ -24,7 +25,12 @@
 #include <boost/cast.hpp>
 #include <fmt/core.h>
 
+#if __has_include(<common/services/cpp/security/FizzThriftFactory.h>)
 #include <common/services/cpp/security/FizzThriftFactory.h>
+#define FBTHRIFT_HAS_INTERNAL_FIZZ_THRIFT_FACTORY 1
+#else
+#define FBTHRIFT_HAS_INTERNAL_FIZZ_THRIFT_FACTORY 0
+#endif
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <fizz/backend/openssl/certificate/CertUtils.h>
@@ -49,7 +55,6 @@
 #include <folly/io/async/EventBase.h>
 #include <folly/io/async/test/TestSSLServer.h>
 #include <folly/observer/SimpleObservable.h>
-#include <folly/synchronization/test/Barrier.h>
 #include <folly/system/ThreadName.h>
 #include <folly/test/TestUtils.h>
 #include <folly/testing/TestUtil.h>
@@ -746,10 +751,10 @@ TEST(ThriftServer, EnforceEgressMemoryLimit) {
     void echoRequest(
         std::string& ret, std::unique_ptr<std::string> req) override {
       ret = *std::move(req);
-      barrier.wait();
+      barrier.arrive_and_wait();
     }
 
-    folly::test::Barrier barrier{2};
+    std::barrier<> barrier{2};
   };
 
   // Allocate a server.
@@ -814,7 +819,7 @@ TEST(ThriftServer, EnforceEgressMemoryLimit) {
     std::string data(chunkSize, 'a');
     fv.emplace_back(client.semifuture_echoRequest(std::move(data)));
     flushClientWrites();
-    handler->barrier.wait();
+    handler->barrier.arrive_and_wait();
   }
 
   // The client socket should still be open.
@@ -825,7 +830,7 @@ TEST(ThriftServer, EnforceEgressMemoryLimit) {
   // The next response should put us over the egress limit.
   fv.emplace_back(client.semifuture_echoRequest(std::string(chunkSize, 'a')));
   flushClientWrites();
-  handler->barrier.wait();
+  handler->barrier.arrive_and_wait();
 
   // Wait for the connection to drop.
   ASSERT_FALSE(isClientChannelGood(std::chrono::seconds(20)));
@@ -860,10 +865,10 @@ TEST(ThriftServer, SocketWriteTimeout) {
     void echoRequest(
         std::string& _return, std::unique_ptr<std::string>) override {
       _return = std::string(kResponseSize, 'x'); // big response
-      barrier.wait();
+      barrier.arrive_and_wait();
     }
 
-    folly::test::Barrier barrier{2};
+    std::barrier<> barrier{2};
 
    private:
     const size_t kResponseSize = 10ul << 20;
@@ -907,7 +912,7 @@ TEST(ThriftServer, SocketWriteTimeout) {
   for (auto i = 0; i < 10; i++) {
     fv.emplace_back(client.semifuture_echoRequest("ignored"));
     flushClientWrites();
-    handler->barrier.wait();
+    handler->barrier.arrive_and_wait();
   }
 
   // Trigger write timeout on the server
@@ -2861,6 +2866,7 @@ TEST(ThriftServer, StopTLSDowngrade) {
   base.loopOnce();
 }
 
+#if FBTHRIFT_HAS_INTERNAL_FIZZ_THRIFT_FACTORY
 TEST(FizzThriftFactory, CreateCompositeReadRecordLayer) {
   facebook::services::FizzThriftFactory factory;
 
@@ -2908,6 +2914,7 @@ TEST(FizzThriftFactory, CreateCompositeWriteRecordLayer) {
           appTrafficLayer.get()),
       nullptr);
 }
+#endif
 
 TEST(ThriftServer, SSLRequiredAllowsLocalPlaintext) {
   auto server = TestThriftServerFactory<TestHandler>().create();

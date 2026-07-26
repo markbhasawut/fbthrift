@@ -552,27 +552,33 @@ FastThriftServerT<Stats>::buildRocketPipeline(
         .setHead(transportHandler)
         .setTail(appAdapter)
         .setAllocator(&rocketAllocator_)
-        .addNextInbound<frame::read::handler::FrameLengthParserHandler>(
+        .template addNextInbound<
+            frame::read::handler::FrameLengthParserHandler>(
             frame_length_parser_handler_tag)
-        .addNextOutbound<frame::write::handler::BatchingFrameHandler>(
+        .template addNextOutbound<frame::write::handler::BatchingFrameHandler>(
             batching_frame_handler_tag)
-        .addNextOutbound<frame::write::handler::FrameLengthEncoderHandler>(
+        .template addNextOutbound<
+            frame::write::handler::FrameLengthEncoderHandler>(
             frame_length_encoder_handler_tag)
-        .addNextDuplex<frame::handler::FrameCodecHandler>(
+        .template addNextDuplex<frame::handler::FrameCodecHandler>(
             frame_codec_handler_tag)
-        .addNextInbound<frame::read::handler::FrameDefragmentationHandler>(
+        .template addNextInbound<
+            frame::read::handler::FrameDefragmentationHandler>(
             frame_defragmentation_handler_tag)
-        .addNextOutbound<frame::write::handler::FrameFragmentationHandler>(
+        .template addNextOutbound<
+            frame::write::handler::FrameFragmentationHandler>(
             frame_fragmentation_handler_tag,
             frame::write::FragmentationHandlerConfig{})
-        .addNextDuplex<
+        .template addNextDuplex<
             rocket::server::handler::RocketServerMessageMarshalHandler>(
             rocket_server_message_marshal_handler_tag)
-        .addNextDuplex<rocket::server::handler::RocketServerSetupFrameHandler>(
+        .template addNextDuplex<
+            rocket::server::handler::RocketServerSetupFrameHandler>(
             server_setup_frame_handler_tag, std::move(onSetupComplete))
-        .addNextDuplex<rocket::server::handler::RocketServerStreamStateHandler>(
+        .template addNextDuplex<
+            rocket::server::handler::RocketServerStreamStateHandler>(
             server_stream_state_handler_tag)
-        .addNextDuplex<
+        .template addNextDuplex<
             rocket::server::handler::RocketServerRequestResponseHandler>(
             server_request_response_frame_handler_tag)
         .template addNextDuplex<RocketMetricsHandler<Direction::Server, Stats>>(
@@ -587,27 +593,33 @@ FastThriftServerT<Stats>::buildRocketPipeline(
         .setHead(transportHandler)
         .setTail(appAdapter)
         .setAllocator(&rocketAllocator_)
-        .addNextInbound<frame::read::handler::FrameLengthParserHandler>(
+        .template addNextInbound<
+            frame::read::handler::FrameLengthParserHandler>(
             frame_length_parser_handler_tag)
-        .addNextOutbound<frame::write::handler::BatchingFrameHandler>(
+        .template addNextOutbound<frame::write::handler::BatchingFrameHandler>(
             batching_frame_handler_tag)
-        .addNextOutbound<frame::write::handler::FrameLengthEncoderHandler>(
+        .template addNextOutbound<
+            frame::write::handler::FrameLengthEncoderHandler>(
             frame_length_encoder_handler_tag)
-        .addNextDuplex<frame::handler::FrameCodecHandler>(
+        .template addNextDuplex<frame::handler::FrameCodecHandler>(
             frame_codec_handler_tag)
-        .addNextInbound<frame::read::handler::FrameDefragmentationHandler>(
+        .template addNextInbound<
+            frame::read::handler::FrameDefragmentationHandler>(
             frame_defragmentation_handler_tag)
-        .addNextOutbound<frame::write::handler::FrameFragmentationHandler>(
+        .template addNextOutbound<
+            frame::write::handler::FrameFragmentationHandler>(
             frame_fragmentation_handler_tag,
             frame::write::FragmentationHandlerConfig{})
-        .addNextDuplex<
+        .template addNextDuplex<
             rocket::server::handler::RocketServerMessageMarshalHandler>(
             rocket_server_message_marshal_handler_tag)
-        .addNextDuplex<rocket::server::handler::RocketServerSetupFrameHandler>(
+        .template addNextDuplex<
+            rocket::server::handler::RocketServerSetupFrameHandler>(
             server_setup_frame_handler_tag, std::move(onSetupComplete))
-        .addNextDuplex<rocket::server::handler::RocketServerStreamStateHandler>(
+        .template addNextDuplex<
+            rocket::server::handler::RocketServerStreamStateHandler>(
             server_stream_state_handler_tag)
-        .addNextDuplex<
+        .template addNextDuplex<
             rocket::server::handler::RocketServerRequestResponseHandler>(
             server_request_response_frame_handler_tag)
         .build();

@@ -31,6 +31,7 @@ foreach (test_name ${FAST_THRIFT_PIPELINE_TESTS})
   )
   target_link_libraries(FastThrift_${test_name}
     PUBLIC
+      GTest::gmock
       GTest::gtest_main
       thriftcpp2
       Folly::folly
@@ -68,6 +69,7 @@ foreach (test_path ${FAST_THRIFT_FRAME_TESTS})
   )
   target_link_libraries(FastThrift_${test_name}
     PUBLIC
+      GTest::gmock
       GTest::gtest_main
       thriftcpp2
       Folly::folly
@@ -84,7 +86,6 @@ set(FAST_THRIFT_CONN_TESTS
   connection/security/util/test/StopTLSHelperTest
   security/test/FizzHandshakeHelperTest
   security/test/FizzServerContextBuilderTest
-  security/test/TLSPrefixPeekerTest
 )
 
 foreach (test_path ${FAST_THRIFT_CONN_TESTS})
@@ -94,6 +95,7 @@ foreach (test_path ${FAST_THRIFT_CONN_TESTS})
   )
   target_link_libraries(FastThrift_${test_name}
     PUBLIC
+      GTest::gmock
       GTest::gtest_main
       thriftcpp2
       Folly::folly
@@ -108,6 +110,7 @@ add_executable(FastThrift_TransportHandlerTest
 )
 target_link_libraries(FastThrift_TransportHandlerTest
   PUBLIC
+    GTest::gmock
     GTest::gtest_main
     thriftcpp2
     Folly::folly

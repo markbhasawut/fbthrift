@@ -108,10 +108,10 @@ class RaiserHandler : public apache::thrift::ServiceHandler<Raiser> {
   void async_tm_doRaise(HandlerCallbackPtr<void> cb) override {
     go_(std::move(cb));
   }
-  void async_tm_get200(HandlerCallbackPtr<string> cb) override {
+  void async_tm_get200(HandlerCallbackPtr<unique_ptr<string>> cb) override {
     go_(std::move(cb));
   }
-  void async_tm_get500(HandlerCallbackPtr<string> cb) override {
+  void async_tm_get500(HandlerCallbackPtr<unique_ptr<string>> cb) override {
     go_(std::move(cb));
   }
 

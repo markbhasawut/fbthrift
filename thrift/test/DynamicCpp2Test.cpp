@@ -101,8 +101,10 @@ static dynamic kDynamics[] = {
 class TestServiceHandler
     : public apache::thrift::ServiceHandler<DynamicTestService> {
  public:
-  void echo(SerializableDynamic& out, const SerializableDynamic& in) override {
-    out = in;
+  void echo(
+      SerializableDynamic& out,
+      std::unique_ptr<SerializableDynamic> in) override {
+    out = *in;
   }
 };
 

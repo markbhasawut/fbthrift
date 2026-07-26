@@ -14,6 +14,11 @@
 
 include(GoogleTest)
 
+add_library(cpp1_test_support STATIC
+  ../../cpp2/test/util/TrackingTProcessorEventHandler.cpp
+)
+target_link_libraries(cpp1_test_support PUBLIC thriftcpp2)
+
 set(CPP1_CORE_TESTS
   Base64Test
   ContextStackFrameworkMetadataTest
@@ -37,5 +42,9 @@ foreach (test_name ${CPP1_CORE_TESTS})
       Folly::folly
       fmt::fmt
   )
+  if (test_name STREQUAL "ContextStackFrameworkMetadataTest"
+      OR test_name STREQUAL "ContextStackTest")
+    target_link_libraries(Cpp1_${test_name} PUBLIC cpp1_test_support)
+  endif ()
   gtest_discover_tests(Cpp1_${test_name})
 endforeach ()

@@ -26,12 +26,17 @@ foreach (test_name ${SECURITY_TESTS})
   )
   target_link_libraries(Security_${test_name}
     PUBLIC
+      GTest::gmock
       GTest::gtest_main
       thriftcpp2
       thriftprotocol
       Folly::folly
       fmt::fmt
   )
+  if (test_name STREQUAL "ThriftTLSHandshakeTest")
+    target_link_libraries(Security_${test_name}
+      PUBLIC fizz::fizz_test_support)
+  endif ()
   gtest_discover_tests(Security_${test_name})
 endforeach ()
 

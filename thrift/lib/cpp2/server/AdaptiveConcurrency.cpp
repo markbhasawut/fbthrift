@@ -134,7 +134,7 @@ void AdaptiveConcurrencyController::requestStarted(Clock::time_point started) {
 bool AdaptiveConcurrencyController::inSamplingPeriod(
     Clock::time_point ts) const {
   auto start = samplingPeriodStart_.load();
-  return start != kZero && ts > start;
+  return start != kZero && ts >= start;
 }
 
 void AdaptiveConcurrencyController::requestFinished(

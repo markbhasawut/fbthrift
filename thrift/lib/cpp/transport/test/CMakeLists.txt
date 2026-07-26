@@ -32,5 +32,10 @@ foreach (test_name ${TRANSPORT_TESTS})
       Folly::folly
       fmt::fmt
   )
+  if (test_name STREQUAL "THeaderTest")
+    # Keep the rocket compression implementation on this test edge. Making
+    # cpp transport depend on cpp2 would create a production-layer cycle.
+    target_link_libraries(Transport_${test_name} PUBLIC thriftcpp2)
+  endif ()
   gtest_discover_tests(Transport_${test_name})
 endforeach ()

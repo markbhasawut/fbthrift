@@ -20,16 +20,19 @@ foreach (thrift_file Module CompactProtocolTestStructs)
      "${thrift_file}" #file_name
      "" #services
      "cpp2" #language
-     "frozen2,layouts" #options
+     "" #options
      "${CMAKE_CURRENT_SOURCE_DIR}" #file_path
      "${CMAKE_CURRENT_BINARY_DIR}" #output_path
      "thrift/lib/cpp2/protocol/test" #include_prefix
      THRIFT_INCLUDE_DIRECTORIES ${THRIFT_SOURCE_DIR}
   )
-  set_source_files_properties(${thrift_file} PROPERTIES GENERATED TRUE)
+  bypass_source_check(${${thrift_file}-cpp2-SOURCES})
   set(GENERATED_THRIFT_SOURCES ${GENERATED_THRIFT_SOURCES}
       ${${thrift_file}-cpp2-SOURCES})
 endforeach ()
+
+add_library(protocol_test_generated STATIC ${GENERATED_THRIFT_SOURCES})
+target_link_libraries(protocol_test_generated PUBLIC thriftcpp2)
 
 # Test files to compile.
 set(PROTOCOL_TESTS
@@ -49,12 +52,12 @@ set(PROTOCOL_TESTS
 # Build each test independently.
 foreach (test_name ${PROTOCOL_TESTS})
   add_executable(${test_name}
-     ${test_name}.cpp
-     ${GENERATED_THRIFT_SOURCES})
+     ${test_name}.cpp)
   target_compile_options(${test_name} PUBLIC
      -Wno-shadow-compatible-local)
   target_link_libraries(${test_name}
      GTest::gtest_main
+     protocol_test_generated
      thriftcpp2
      Folly::folly
      fmt::fmt

@@ -25,10 +25,14 @@ foreach (thrift_file Binary Compatibility Example Helper Reference)
      "thrift/lib/cpp2/frozen/test" #include_prefix
      THRIFT_INCLUDE_DIRECTORIES ${THRIFT_SOURCE_DIR}
   )
-  set_source_files_properties(${thrift_file} PROPERTIES GENERATED TRUE)
+  bypass_source_check(${${thrift_file}-cpp2-SOURCES})
   set(FROZEN_TEST_GENERATED_THRIFT_SOURCES ${FROZEN_TEST_GENERATED_THRIFT_SOURCES}
       ${${thrift_file}-cpp2-SOURCES})
 endforeach ()
+
+add_library(frozen_test_generated STATIC
+  ${FROZEN_TEST_GENERATED_THRIFT_SOURCES})
+target_link_libraries(frozen_test_generated PUBLIC thriftcpp2)
 
 set(FROZEN_TESTS
   CompatibilityTest
@@ -48,11 +52,12 @@ set(FROZEN_TESTS
 foreach (test_name ${FROZEN_TESTS})
   add_executable(Frozen_${test_name}
     ${test_name}.cpp
-    ${FROZEN_TEST_GENERATED_THRIFT_SOURCES}
   )
   target_link_libraries(Frozen_${test_name}
     PUBLIC
+      GTest::gmock
       GTest::gtest_main
+      frozen_test_generated
       thriftfrozen2
       thriftcpp2
       thriftprotocol

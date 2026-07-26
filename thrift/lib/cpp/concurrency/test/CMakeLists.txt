@@ -28,6 +28,7 @@ foreach (test_name ${CONCURRENCY_TESTS})
   target_link_libraries(Concurrency_${test_name}
     PUBLIC
       GTest::gtest_main
+      GTest::gmock
       concurrency
       thrift-core
       Folly::folly

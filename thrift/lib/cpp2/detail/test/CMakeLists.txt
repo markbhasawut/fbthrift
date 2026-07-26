@@ -16,15 +16,15 @@ include(GoogleTest)
 
 thrift_generate(
    "EventHandler" #file_name
-   "" #services
+   "Foo;Bar" #services
    "cpp2" #language
-   "frozen2" #options
+   "" #options
    "${CMAKE_CURRENT_SOURCE_DIR}" #file_path
    "${CMAKE_CURRENT_BINARY_DIR}" #output_path
    "thrift/lib/cpp2/detail/test" #include_prefix
    THRIFT_INCLUDE_DIRECTORIES ${THRIFT_SOURCE_DIR}
 )
-set_source_files_properties(EventHandler PROPERTIES GENERATED TRUE)
+bypass_source_check(${EventHandler-cpp2-SOURCES})
 
 add_executable(Detail_EventHandlerRuntimeTest
   EventHandlerRuntimeTest.cpp

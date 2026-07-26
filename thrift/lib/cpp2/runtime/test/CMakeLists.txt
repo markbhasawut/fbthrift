@@ -20,6 +20,7 @@ add_executable(Runtime_InitTest
 target_link_libraries(Runtime_InitTest
   PUBLIC
     GTest::gtest_main
+    cpp2_test_support
     thriftmetadata
     thriftcpp2
     thriftprotocol

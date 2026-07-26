@@ -14,30 +14,32 @@
 
 include(GoogleTest)
 
-foreach (thrift_file DynamicPatchTest OldTerseWrite)
+foreach(thrift_file DynamicPatchTest OldTerseWrite)
   thrift_generate(
-     "${thrift_file}" #file_name
-     "" #services
-     "cpp2" #language
-     "frozen2" #options
-     "${CMAKE_CURRENT_SOURCE_DIR}" #file_path
-     "${CMAKE_CURRENT_BINARY_DIR}" #output_path
-     "thrift/lib/cpp2/patch/test" #include_prefix
-     THRIFT_INCLUDE_DIRECTORIES ${THRIFT_SOURCE_DIR}
+    "${thrift_file}"
+    ""
+    "cpp2"
+    "patch"
+    "${CMAKE_CURRENT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_BINARY_DIR}"
+    "thrift/lib/cpp2/patch/test"
+    TARGET_NAME_BASE "patch_test_${thrift_file}"
+    THRIFT_INCLUDE_DIRECTORIES ${THRIFT_SOURCE_DIR}
   )
-  set_source_files_properties(${thrift_file} PROPERTIES GENERATED TRUE)
-  set(PATCH_TEST_GENERATED_THRIFT_SOURCES ${PATCH_TEST_GENERATED_THRIFT_SOURCES}
-      ${${thrift_file}-cpp2-SOURCES})
-endforeach ()
+  list(APPEND PATCH_TEST_GENERATED_THRIFT_SOURCES
+    ${patch_test_${thrift_file}-cpp2-SOURCES})
+endforeach()
 
-add_executable(Patch_DynamicPatchTest
-  DynamicPatchTest.cpp
-  ${PATCH_TEST_GENERATED_THRIFT_SOURCES}
-)
+bypass_source_check(${PATCH_TEST_GENERATED_THRIFT_SOURCES})
+add_library(patch_test_generated STATIC
+  ${PATCH_TEST_GENERATED_THRIFT_SOURCES})
+target_link_libraries(patch_test_generated PUBLIC thriftcpp2)
+
+add_executable(Patch_DynamicPatchTest DynamicPatchTest.cpp)
 target_link_libraries(Patch_DynamicPatchTest
   PUBLIC
     GTest::gtest_main
-    thrifttype
+    patch_test_generated
     thriftcpp2
     thriftprotocol
     Folly::folly

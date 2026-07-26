@@ -20,16 +20,20 @@ foreach (thrift_file GoldenFixtures InterpreterRoundTripFixtures)
      "${thrift_file}" #file_name
      "" #services
      "cpp2" #language
-     "frozen2,layouts" #options
+     "" #options
      "${CMAKE_CURRENT_SOURCE_DIR}" #file_path
      "${CMAKE_CURRENT_BINARY_DIR}" #output_path
      "thrift/lib/cpp2/transcode/test" #include_prefix
      THRIFT_INCLUDE_DIRECTORIES ${THRIFT_SOURCE_DIR}
   )
-  set_source_files_properties(${thrift_file} PROPERTIES GENERATED TRUE)
+  bypass_source_check(${${thrift_file}-cpp2-SOURCES})
   set(TRANSCODE_GENERATED_THRIFT_SOURCES ${TRANSCODE_GENERATED_THRIFT_SOURCES}
       ${${thrift_file}-cpp2-SOURCES})
 endforeach ()
+
+add_library(transcode_test_generated STATIC
+  ${TRANSCODE_GENERATED_THRIFT_SOURCES})
+target_link_libraries(transcode_test_generated PUBLIC thriftcpp2)
 
 # Test executables
 set(TRANSCODE_TESTS
@@ -49,11 +53,11 @@ set(TRANSCODE_TESTS
 
 foreach (test_name ${TRANSCODE_TESTS})
   add_executable(${test_name}
-     ${test_name}.cpp
-     ${TRANSCODE_GENERATED_THRIFT_SOURCES})
+     ${test_name}.cpp)
   target_link_libraries(${test_name}
      PUBLIC
        GTest::gtest_main
+       transcode_test_generated
        thrifttranscode
        thriftprotocol
        thriftcpp2
@@ -66,11 +70,11 @@ endforeach ()
 # GoldenTranscodeTest also needs GoldenTestData.cpp
 add_executable(GoldenTranscodeTest
    GoldenTranscodeTest.cpp
-   GoldenTestData.cpp
-   ${TRANSCODE_GENERATED_THRIFT_SOURCES})
+   GoldenTestData.cpp)
 target_link_libraries(GoldenTranscodeTest
    PUBLIC
      GTest::gtest_main
+     transcode_test_generated
      thrifttranscode
      thriftprotocol
      thriftcpp2

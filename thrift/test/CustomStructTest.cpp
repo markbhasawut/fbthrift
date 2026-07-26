@@ -52,11 +52,13 @@ Container createContainer() {
 class CustomStructHandler
     : public apache::thrift::ServiceHandler<CustomStruct> {
  public:
-  void echoStruct(MyCustomStruct& out, const MyCustomStruct& in) override {
-    out = in;
+  void echoStruct(
+      MyCustomStruct& out, std::unique_ptr<MyCustomStruct> in) override {
+    out = *in;
   }
-  void echoUnion(MyCustomUnion& out, const MyCustomUnion& in) override {
-    out = in;
+  void echoUnion(
+      MyCustomUnion& out, std::unique_ptr<MyCustomUnion> in) override {
+    out = *in;
   }
 };
 

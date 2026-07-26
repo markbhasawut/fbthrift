@@ -253,7 +253,7 @@ class FrameFragmentationHandlerT : public folly::EventBase::LoopCallback {
       streams_.erase(streamId);
     }
     for (auto it = immediateQueue_.begin(); it != immediateQueue_.end();) {
-      auto& f = it->get<ComposedFrame>();
+      auto& f = it->template get<ComposedFrame>();
       if (f.streamId == streamId) {
         const size_t sz = f.data ? f.data->computeChainDataLength() : 0;
         decrPending(sz, 1);
@@ -312,7 +312,7 @@ class FrameFragmentationHandlerT : public folly::EventBase::LoopCallback {
     while (!immediateQueue_.empty()) {
       auto box = std::move(immediateQueue_.front());
       immediateQueue_.pop_front();
-      auto& f = box.get<ComposedFrame>();
+      auto& f = box.template get<ComposedFrame>();
       const size_t sz = f.data ? f.data->computeChainDataLength() : 0;
       const uint32_t streamId = f.streamId;
       // Settle the pending accounting before handing the frame off — once

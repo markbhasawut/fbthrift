@@ -1,6 +1,303 @@
+---
+sidebar_position: 1
+title: Serialization protocols and runtime APIs
+---
+
 # Serialization Protocols
 
-A serialization protocol in Thrift is a format that defines how data is serialized into a sequence of bytes and deserialized from it.
+A serialization protocol in Thrift defines how a value is encoded into bytes
+and decoded from bytes. It is one layer of the RPC stack, not the complete RPC
+transport.
+
+## Protocol, framing, and transport are different layers
+
+The word *protocol* appears in several FBThrift APIs with different meanings.
+Keep these layers separate:
+
+| Layer | Examples | What it controls |
+| --- | --- | --- |
+| Serialization protocol | Binary, Compact, deprecated JSON, SimpleJSON, JSON5 | The bytes representing fields and values. |
+| RPC metadata and framing | Thrift Header, Rocket request metadata, RSocket frames | Method names, sequence/stream IDs, timeouts, headers, compression, and message boundaries. |
+| Byte transport | TCP, TLS/Fizz, HTTP/2, QUIC | How framed bytes move between endpoints. |
+| Runtime implementation | C++ `RocketClientChannel`, Java RSocket, C++ `fast_thrift` | Scheduling, buffer ownership, backpressure, and dispatch. |
+
+Rocket (sometimes misspelled “rocker”) and RSocket are RPC framing/transports.
+They carry a serialized Binary or Compact payload; they are not alternatives
+to Binary or Compact. Likewise, `fast_thrift` is an experimental C++ Rocket
+implementation, not a wire serialization format. See
+[RPC transports and runtime stacks](../rpc-transports.md).
+
+## Choosing a serialization protocol
+
+| Protocol | Field identity | Human readable | Recommended use | C++ entry point |
+| --- | --- | --- | --- | --- |
+| Compact | Numeric field ID | No | Default RPC and persistent data when CPU cost from varints is acceptable. Usually the smallest wire size. | `CompactSerializer` |
+| Binary | Numeric field ID | No | RPC or persistent data when fixed-width encoding, simpler decoding, or cursor-based serialization is preferred. | `BinarySerializer` |
+| JSON5 | Field name, with optional IDs in input | Yes | Schema-aware configuration, inspection, and interchange with manually authored JSON/JSON5. | `Json5ProtocolUtils` |
+| SimpleJSON | Field name | Yes | Legacy JSON interchange. It loses wire type information and field renames are wire changes. Deprecated for new formats. | `SimpleJSONSerializer` |
+| JSON | Numeric field IDs plus explicit Thrift type tags | Yes, but verbose | Compatibility with the old typed Thrift JSON encoding. Deprecated; this is not ordinary application JSON. | `JSONSerializer` |
+| Debug | Field name | Yes | Logging only. Write-only and intentionally not stable. | `DebugProtocolWriter` |
+| Frozen2 | Layout position | No | Legacy C++ memory-mappable storage. Deprecated and not an RPC protocol. | `thriftfrozen2` APIs |
+
+Compact and Binary are the only serialization protocols supported by generated
+C++ RPC clients and processors. JSON-family APIs are standalone serialization
+surfaces. Selecting a JSON protocol ID on a generated `RequestChannel` fails in
+the generated `withProtocolReader`/`withProtocolWriter` dispatch before the
+request is sent.
+
+Compact and Binary both identify fields by numeric ID, so adding an optional
+field and skipping an unknown field work without exchanging a schema. JSON5
+and SimpleJSON use field names in their normal object form; renaming a field is
+therefore a wire compatibility change for those encodings.
+
+## Runtime availability
+
+The compiler can generate a language even when that language runtime does not
+implement every serialization protocol. Treat code-generation support and
+runtime protocol support as separate axes:
+
+| Runtime | Standalone serialization | Generated RPC payload |
+| --- | --- | --- |
+| C++ cpp2 | Binary, Compact, deprecated typed JSON, SimpleJSON, JSON5; Debug and Frozen2 are specialized surfaces | Binary, Compact |
+| Modern Java | Binary, Compact, typed JSON, SimpleJSON, SimpleJSONBase64 | Binary, Compact |
+| `javadeprecated` | Binary, Compact, typed JSON, SimpleJSON | Binary, Compact through legacy transports |
+| Android Lite | Binary | Binary |
+| Modern Python | Binary, Compact, deprecated typed JSON, SimpleJSON (named `Protocol.JSON`), JSON5 | Binary, Compact |
+| Legacy Python | Binary, Compact, typed JSON, SimpleJSON | Transport-dependent legacy RPC |
+| Rust | `BinaryProtocol`, `CompactProtocol`, `SimpleJsonProtocol` | Depends on the selected Rust transport/runtime integration |
+| Go | Binary, Compact, typed `CompactJSON`, SimpleJSON, SimpleJSON V2 | Binary, Compact in Header/HTTP/Rocket integration |
+
+This table describes implementations in this OSS tree, not a promise of
+cross-language RPC support for every standalone serializer. Persistent data
+also needs an explicit protocol/version contract; relying on a language's
+default makes migrations and mixed-runtime readers fragile.
+
+## C++ APIs
+
+Link generated types and the protocol runtime. A serialization-only consumer
+does not need the RPC stack:
+
+```cmake
+find_package(FBThrift CONFIG REQUIRED COMPONENTS compiler)
+
+target_link_libraries(my_codec PRIVATE
+  my_types-cpp2
+  FBThrift::thriftprotocol
+)
+```
+
+`FBThrift::thriftprotocol` provides the protocol readers, writers, serializers,
+JSON5 implementation, and their transitive core dependencies. Link
+`FBThrift::thriftcpp2` instead when the same target also uses generated clients,
+servers, Rocket, streams, or sinks.
+
+### Serialize generated types
+
+```cpp
+#include <string>
+
+#include <thrift/lib/cpp2/protocol/Serializer.h>
+
+#include "gen-cpp2/catalog_types.h"
+
+catalog::Item item;
+item.id() = 42;
+item.name() = "keyboard";
+
+std::string compact =
+    apache::thrift::CompactSerializer::serialize<std::string>(item);
+catalog::Item decoded =
+    apache::thrift::CompactSerializer::deserialize<catalog::Item>(compact);
+```
+
+For a chained, allocation-friendly result, serialize into an `IOBufQueue`:
+
+```cpp
+#include <folly/io/IOBufQueue.h>
+#include <thrift/lib/cpp2/protocol/Serializer.h>
+
+auto queue =
+    apache::thrift::BinarySerializer::serialize<folly::IOBufQueue>(item);
+std::unique_ptr<folly::IOBuf> encoded = queue.move();
+
+catalog::Item decoded =
+    apache::thrift::BinarySerializer::deserialize<catalog::Item>(encoded.get());
+```
+
+The serializer defaults to copying externally owned buffers. Passing
+`SHARE_EXTERNAL_BUFFER` can remove copies for eligible binary/IOBuf fields,
+but the source memory must remain allocated and immutable until the consumer
+has finished with the serialized chain.
+
+The aliases in `thrift/lib/cpp2/protocol/Serializer.h` are:
+
+```cpp
+using CompactSerializer =
+    Serializer<CompactProtocolReader, CompactProtocolWriter>;
+using BinarySerializer =
+    Serializer<BinaryProtocolReader, BinaryProtocolWriter>;
+using JSONSerializer = Serializer<JSONProtocolReader, JSONProtocolWriter>;
+using SimpleJSONSerializer =
+    Serializer<SimpleJSONProtocolReader, SimpleJSONProtocolWriter>;
+```
+
+Use the reader/writer classes directly when writing an envelope, streaming
+multiple values through one `folly::io::Cursor`, changing depth limits, or
+integrating a custom protocol. Generated cpp2 code uses duck-typed protocol
+classes instead of a virtual base on the hot path; `VirtualProtocol.h` exists
+for code that truly needs type erasure.
+
+### JSON5
+
+The OSS CMake `thriftprotocol` target builds JSON5 and publishes
+`THRIFT_HAS_JSON5_PROTOCOL`. Use its schema-aware utility API:
+
+```cpp
+#include <thrift/lib/cpp2/protocol/Json5Protocol.h>
+
+std::string json =
+    apache::thrift::Json5ProtocolUtils::toBasicJson(item);
+std::string json5 =
+    apache::thrift::Json5ProtocolUtils::toJson5(item);
+catalog::Item decoded =
+    apache::thrift::Json5ProtocolUtils::fromJson5<catalog::Item>(json5);
+```
+
+`toBasicJson()` emits RFC 8259 JSON. `toJson5()` may emit JSON5 features such
+as unquoted keys, trailing commas, and bare non-finite floating-point values.
+`fromJson5()` accepts the schema-aware rules documented in the
+[JSON5 wire-format section](#json5-protocol).
+
+The cpp2 generator option `json` is unrelated to choosing an RPC protocol. It
+emits explicit SimpleJSON reader/writer instantiations for the generated types.
+Enable it only when that generated module is serialized with
+`SimpleJSONSerializer`; it increases generated code size and C++ compile time.
+
+### Select the C++ RPC protocol
+
+Rocket and Header channels default to Compact. Override the channel before
+constructing the generated client:
+
+```cpp
+#include <folly/io/async/AsyncSocket.h>
+#include <thrift/lib/cpp/protocol/TProtocolTypes.h>
+#include <thrift/lib/cpp2/async/RocketClientChannel.h>
+
+auto channel = apache::thrift::RocketClientChannel::newChannel(
+    folly::AsyncSocket::newSocket(&eventBase, address));
+channel->setProtocolId(apache::thrift::protocol::T_BINARY_PROTOCOL);
+
+catalog::CatalogServiceAsyncClient client(std::move(channel));
+```
+
+For legacy Header framing:
+
+```cpp
+#include <thrift/lib/cpp2/async/HeaderClientChannel.h>
+
+auto channel = apache::thrift::HeaderClientChannel::newChannel(
+    folly::AsyncSocket::newSocket(&eventBase, address),
+    apache::thrift::HeaderClientChannel::Options().setProtocolId(
+        apache::thrift::protocol::T_BINARY_PROTOCOL));
+catalog::CatalogServiceAsyncClient client(std::move(channel));
+```
+
+The server reads the protocol ID from the request metadata/framing and dispatches
+Binary or Compact automatically. Both endpoints must support the selected
+serialization protocol; a transport choice does not transcode the payload.
+
+## Protocol identifiers
+
+The C++/Python runtime protocol IDs from
+`thrift/lib/cpp/protocol/TProtocolTypes.h` are:
+
+| ID | C++ enumerator | Meaning |
+| ---: | --- | --- |
+| 0 | `T_BINARY_PROTOCOL` | Binary |
+| 1 | `T_JSON_PROTOCOL` | Deprecated verbose typed JSON |
+| 2 | `T_COMPACT_PROTOCOL` | Compact |
+| 3 | `T_DEBUG_PROTOCOL` | Debug writer |
+| 4 | `T_VIRTUAL_PROTOCOL` | Runtime type-erasure marker, not a wire format |
+| 5 | `T_SIMPLE_JSON_PROTOCOL` | SimpleJSON |
+| 6 | reserved | Former Frozen2 ID; never reuse |
+| 7 | `T_JSON5_PROTOCOL` | JSON5 |
+
+Do not cast these values to or from
+`apache::thrift::type::StandardProtocol`. The standard protocol enum stored in
+`Any` uses `Custom=0`, `Binary=1`, `Compact=2`, `Json=3`, and `SimpleJson=4`.
+Use the generated enum/conversion helpers so an `Any` descriptor never records
+the C++ runtime ID by mistake.
+
+## Java APIs
+
+Modern Java standalone serialization uses `SerializerUtil`:
+
+```java
+import com.facebook.thrift.util.SerializationProtocol;
+import com.facebook.thrift.util.SerializerUtil;
+
+byte[] compact =
+    SerializerUtil.toByteArray(item, SerializationProtocol.TCompact);
+Item decoded =
+    SerializerUtil.fromByteArray(
+        Item.asReader(), compact, SerializationProtocol.TCompact);
+```
+
+`SerializationProtocol` exposes `TBinary`, `TCompact`, `TJSON`,
+deprecated `TSimpleJSON`, and `TSimpleJSONBase64`. Generated modern Java RPC
+uses `org.apache.thrift.ProtocolId` and supports Binary and Compact; client
+builders default to Compact. Java RSocket is the Rocket-compatible transport
+layer and does not change that payload protocol.
+
+`javadeprecated` exposes the corresponding `TBinaryProtocol`,
+`TCompactProtocol`, `TJSONProtocol`, and SimpleJSON classes through its legacy
+transport-oriented API. Android Lite intentionally provides only
+`com.facebook.thrift.lite.protocol.TBinaryProtocol`.
+
+## Python APIs
+
+Modern `thrift.python` serialization defaults to Compact:
+
+```python
+from thrift.python.serializer import Protocol, deserialize, serialize
+from project.catalog.types import Item
+
+encoded = serialize(item, protocol=Protocol.COMPACT)
+decoded = deserialize(Item, encoded, protocol=Protocol.COMPACT)
+```
+
+Its names contain an important compatibility trap:
+
+| Python name | C++ runtime ID | Encoding |
+| --- | ---: | --- |
+| `Protocol.BINARY` | 0 | Binary |
+| `Protocol.DEPRECATED_VERBOSE_JSON` | 1 | Old typed JSON |
+| `Protocol.COMPACT` | 2 | Compact |
+| `Protocol.JSON` | 5 | SimpleJSON |
+| `Protocol.JSON5` | 7 | JSON5 |
+
+`serialize_iobuf()` returns a Folly `IOBuf` without joining the chain into a
+Python `bytes` object. JSON5 additionally accepts
+`Json5ProtocolWriterOptions`; writer options are rejected for the other
+protocols.
+
+Legacy `thrift.py` uses protocol factories such as `TBinaryProtocol`,
+`TCompactProtocol`, `TJSONProtocol`, `TSimpleJSONProtocol`, and
+`THeaderProtocol`. `THeaderProtocol` is a framing/negotiation wrapper around a
+payload protocol, not another value encoding.
+
+## Specialized C++ formats and optimizations
+
+| Name | Classification | Compatibility boundary |
+| --- | --- | --- |
+| Compact V1 | Legacy Compact implementation | Compatibility/testing surface; it has no distinct public RPC protocol ID. |
+| Cursor-based serialization | Binary protocol optimization | Preserves Binary wire format but requires annotated layouts and contiguous input for the view APIs. |
+| Table-based serialization | Generated dispatch optimization | Changes generated implementation, not the selected wire format. |
+| Frozen2 | Layout-based storage format | C++-specific, deprecated, and not negotiated by Rocket/Header. |
+| Debug protocol | Logging formatter | Write-only and explicitly unstable. |
+| `fastproto` | Python acceleration | Accelerates Binary/Compact; does not define a new wire format. |
+| `fast_thrift` | C++ Rocket runtime | Changes framing/runtime implementation; payloads remain Binary or Compact. |
+| Carbon | mcrouter code generation and protocol helpers | Separate mcrouter ecosystem, not an FBThrift standard protocol ID. |
 
 ## Thrift Types
 

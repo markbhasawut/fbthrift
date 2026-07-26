@@ -34,6 +34,22 @@ errors. Output paths follow the IDL namespaces: `py` uses `namespace py` (or
 `namespace py.asyncio` with `asyncio`), while `py3` and `python` use
 `namespace py3`.
 
+## Protocols and transports
+
+Modern `thrift.python` standalone serialization supports Binary, Compact,
+deprecated typed JSON, SimpleJSON, and JSON5. The public enum deliberately
+calls SimpleJSON `Protocol.JSON`; the old typed encoding is
+`Protocol.DEPRECATED_VERBOSE_JSON`. Modern generated RPC accepts Binary or
+Compact and defaults to Compact.
+
+Legacy `thrift.py` exposes `TBinaryProtocol`, `TCompactProtocol`,
+`TJSONProtocol`, `TSimpleJSONProtocol`, and `THeaderProtocol`. The last one is
+a framing/negotiation wrapper, not another value encoding. See
+[serialization protocols and runtime APIs](../features/serialization/protocols.md)
+for exact IDs and examples, and
+[RPC transports and runtime stacks](../features/rpc-transports.md) for the
+Rocket/Header boundary.
+
 ## `py`: legacy pure-Python backend
 
 | Option | Effect |

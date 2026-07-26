@@ -110,7 +110,7 @@ necessary nor safe across fbthrift revisions.
 | Imported target | Use it for | Availability |
 | --- | --- | --- |
 | `FBThrift::thriftcpp2` | Generated C++ services, clients, servers, Rocket/stream/sink RPC, and the complete modern C++ runtime | `THRIFT_RPC=ON`; primary C++ application entry point |
-| `FBThrift::thriftprotocol` | Binary/Compact/JSON protocols, protocol objects, field masks, and generated non-RPC type serialization | Any library build; preferred RPC-free entry point |
+| `FBThrift::thriftprotocol` | Binary/Compact/typed JSON/SimpleJSON/JSON5 protocols, protocol objects, field masks, and generated non-RPC type serialization | Any library build; preferred RPC-free entry point |
 | `FBThrift::thrift-core` | Core C++ types used below the protocol layer | Any library build; normally transitive through `thriftprotocol` |
 | `FBThrift::thriftannotation` | Generated C++ definitions for `thrift/annotation` | Any library build; link directly only when C++ code names those definitions |
 | `FBThrift::thrifttyperep` | Standard type/protocol representation IDLs | Any library build |

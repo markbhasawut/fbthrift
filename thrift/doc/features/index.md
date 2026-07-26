@@ -19,6 +19,11 @@ export const Unsupported = () => (<span class="feature-unsupported">✗</span>);
 The following tables document the current level of support for each Thrift
 feature in different languages.
 
+Start with [serialization protocols](/features/serialization/protocols.md) and
+[RPC transports and runtime stacks](/features/rpc-transports.md) when choosing
+Binary versus Compact, standalone JSON formats, Rocket, Header, HTTP/2, QUIC,
+or the experimental C++ `fast_thrift` runtime.
+
 | Thrift feature | C++ | Hack | Java | Python |
 | :------------- | :-: | :--: | :--: | :----: |
 | [Serialization](/features/serialization/index.md) | <Supported/> | <Supported/> | <Supported/> | <Supported/> |

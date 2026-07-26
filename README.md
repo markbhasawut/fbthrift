@@ -155,8 +155,11 @@ an include to generated code.
 
 See the [CMake code-generation guide](thrift/doc/languages/cmake.md), the
 [compiler-matched generator options](thrift/doc/languages/cpp/code-generation.md),
-and the [standard IDL libraries](thrift/doc/features/standard-idl-libraries.md)
-for package discovery, Python backends, annotations, Any, and Patch.
+the [serialization protocol guide](thrift/doc/features/serialization/protocols.md),
+the [RPC transport guide](thrift/doc/features/rpc-transports.md), and the
+[standard IDL libraries](thrift/doc/features/standard-idl-libraries.md) for
+package discovery, C++/Java/Python runtime APIs, Rocket and `fast_thrift`,
+annotations, Any, and Patch.
 
 ### Python Build (thrift-python)
 

@@ -1,19 +1,34 @@
 # Serialization
 
+Start with [Serialization protocols and runtime APIs](protocols.md) for the
+Binary, Compact, JSON, JSON5, C++, Java, and Python APIs. Rocket, RSocket,
+Header, HTTP/2, and `fast_thrift` are documented separately as
+[RPC transports and runtime stacks](../rpc-transports.md).
+
 <!-- https://www.internalfb.com/intern/wiki/Thrift/Overview/Serialization/?noredirect -->
 
 ## Protocols
 
-There are two approaches that may be used for serialization:
+There are two compatibility models used by the standard serialization
+protocols:
 
 * Serialization by field id
-   * In this case, the serialized data contains the id, the type, and the value for every field that is serialized. The name is not included in the serialized data. If the field is of an enumeration type, the integer value of the enumerator is included in the serialized data, and the enumerator (the named constant) is not included.
-   * Compact/Binary/Frozen protocols use this approach, which are used by most thrift services at Meta.
+   * Binary and Compact encode the numeric field id and value; the wire type is
+     encoded explicitly or implied by the Compact type tag. The name is not
+     included. Enum values are encoded as integers, not named constants.
+   * The deprecated typed JSON protocol also addresses fields by numeric id and
+     carries explicit Thrift type tags despite its textual representation.
 * Serialization by field name
-   * In this case, the serialized data contains the name, the type, and the value for every field that is serialized. The id is not included in the serialized data. If the field is of an enumeration type, the enumerator (the named constant) is included in the serialized data, and the integer value of the enumerator is not included.
-   * JSON protocol uses this approach. Most notable use cases at Meta are Configerator and Tupperware to generate configs in a human readable JSON format.
+   * SimpleJSON and the normal JSON5 object form identify fields by their IDL
+     names. Renaming a field is therefore a wire change for these formats.
+   * These formats are schema-aware during deserialization because ordinary
+     JSON does not carry the complete Thrift wire-type information.
 
 *Caution: Never mix serialization by field id and serialization by field name within the same use case.*
+
+Frozen2 is a separate layout-based storage format rather than either RPC
+model. See [serialization protocols and runtime APIs](protocols.md) for the
+complete protocol matrix and language-specific entry points.
 
 ## Qualifiers
 

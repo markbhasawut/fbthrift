@@ -77,6 +77,21 @@ This generator has no options. Its runtime targets Java 8 bytecode and avoids
 the Netty/Reactor dependency surface. Build and test it with JDK 21 or 25; the
 compiler release controls the emitted bytecode, not the JDK used to run Maven.
 
+## Protocols and transports
+
+The modern standalone runtime exposes Binary, Compact, typed JSON, SimpleJSON,
+and SimpleJSONBase64 through `SerializerUtil` and `SerializationProtocol`.
+Generated modern RPC uses `org.apache.thrift.ProtocolId`, supports Binary and
+Compact, and defaults to Compact. RSocket and unified Header are transports;
+they do not define a third payload format.
+
+`javadeprecated` exposes the corresponding legacy protocol classes.
+Android Lite deliberately implements only `TBinaryProtocol`. See
+[serialization protocols and runtime APIs](../features/serialization/protocols.md)
+for code examples and exact naming, and
+[RPC transports and runtime stacks](../features/rpc-transports.md) for RSocket,
+Header, reference-counted payload ownership, and C++ interoperability.
+
 ## Maven reactor
 
 JDK 21 is the baseline. JDK 25 is supported and activates the Java 25
@@ -84,10 +99,6 @@ multi-release overlay and tests. JDK 22 through 24 are intentionally outside
 the declared support window.
 
 ```sh
-source /opt/anaconda3/etc/profile.d/conda.sh
-conda deactivate
-source .venv/bin/activate
-
 mvn -f thrift/lib/java/pom.xml \
   -Dfbthrift.compiler=/absolute/path/to/thrift1 \
   verify

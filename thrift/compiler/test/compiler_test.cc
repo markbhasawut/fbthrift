@@ -1425,6 +1425,114 @@ TEST(CompilerTest, invalid_and_too_many_splits) {
     }
 )",
       {"--gen", "mstch_cpp2:types_cpp_splits=3a"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: Invalid types_cpp_splits value: `0` (the split count must be positive)
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "mstch_cpp2:types_cpp_splits=0"});
+}
+
+TEST(CompilerTest, cpp2_generator_option_validation) {
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: `schema` is not a cpp2 generator option; use the global `--inject-schema-const` flag with the stage-2 thrift1 compiler
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "mstch_cpp2:schema"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: cpp2 generator option `include_prefix` requires a value
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "mstch_cpp2:include_prefix"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: cpp2 generator option `json` does not take a value
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "mstch_cpp2:json=true"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: cpp2 generator options `single_file_service` and `client_cpp_splits` are incompatible
+    service MyService { void ping(); }
+)",
+      {"--gen",
+       "mstch_cpp2:single_file_service,client_cpp_splits={MyService:1}"});
+
+  // These legacy options intentionally remain accepted no-ops.
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    struct Foo { 1: i32 field }
+  )",
+      {"--gen",
+       "mstch_cpp2:reflection,disable_custom_type_ordering_if_structure_has_uri,deprecated_private_fields_for_cpp_ref,nimble,service_cpp_splits={MissingService:1},templates,visitation"});
+}
+
+TEST(CompilerTest, oss_generator_aliases_and_python_option_validation) {
+  // cpp is the public compatibility alias for the modern cpp2 backend.
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "cpp"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: py generator option `thrift_port` requires a value
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "py:thrift_port"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "py:new_style"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: py3 generator option `include_prefix` requires a value
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "py3:include_prefix"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "py3:intercompatible"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: python generator option `enable_isset_deprecated_unsafe` accepts only the flag form or `=1`
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "python:enable_isset_deprecated_unsafe=0"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: Unknown python generator option `missing`; run `thrift1 --help` for the supported options
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "python:missing"});
 }
 
 TEST(CompilerTest, invalid_and_too_many_client_splits) {
@@ -1471,8 +1579,24 @@ TEST(CompilerTest, invalid_and_too_many_client_splits) {
       i32 func1(1: i32 num);
       i32 func2(1: i32 num);
     }
-  )",
+)",
       {"--gen", "mstch_cpp2:client_cpp_splits={MyService1:3:1,MyService2:2}"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: client_cpp_splits names unknown service `MissingService`
+    service MyService1 { void func1(); }
+  )",
+      {"--gen", "mstch_cpp2:client_cpp_splits={MissingService:1}"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: Invalid pair `MyService1:0` in client_cpp_splits value: `MyService1:0`; service names must be non-empty and split counts must be positive
+    service MyService1 { void func1(); }
+  )",
+      {"--gen", "mstch_cpp2:client_cpp_splits={MyService1:0}"});
 }
 
 TEST(CompilerTest, non_beneficial_lazy_fields) {

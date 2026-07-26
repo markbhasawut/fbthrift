@@ -37,6 +37,105 @@ namespace apache::thrift::compiler {
 
 namespace {
 
+constexpr generator_option_spec kPy3GeneratorOptions[] = {
+    {
+        "auto_migrate",
+        "auto_migrate",
+        generator_option_value_policy::flag,
+        "Generate migration shims that expose thrift.python-compatible Python "
+        "types while retaining the py3 module layout.",
+        "",
+    },
+    {
+        "enable_container_pickling_DO_NOT_USE",
+        "enable_container_pickling_DO_NOT_USE",
+        generator_option_value_policy::flag,
+        "Generate the legacy package __init__.py used by container-pickling "
+        "integration. This is an internal compatibility mode and should not be "
+        "used by new OSS code.",
+        "",
+    },
+    {
+        "gen_legacy_container_converters",
+        "gen_legacy_container_converters",
+        generator_option_value_policy::flag,
+        "Generate legacy list, set, and map conversion paths for migration "
+        "code. This increases generated glue and conversion overhead.",
+        "",
+    },
+    {
+        "include_prefix",
+        "include_prefix=<path>",
+        generator_option_value_policy::required,
+        "Override the prefix used by generated C++ #include directives. It "
+        "does not change the gen-py3 output directory.",
+        "",
+    },
+    {
+        "inplace_migrate",
+        "inplace_migrate",
+        generator_option_value_policy::flag,
+        "Generate py3 structures as wrappers around thrift.python structures "
+        "and emit types_inplace_FBTHRIFT_ONLY_DO_NOT_USE.py.",
+        "",
+    },
+    {
+        "intercompatible",
+        "intercompatible",
+        generator_option_value_policy::flag,
+        "Accepted as a compatibility no-op. The old intercompatible template "
+        "property was removed.",
+        "",
+    },
+    {
+        "no_stream",
+        "no_stream",
+        generator_option_value_policy::flag,
+        "Suppress generated streaming RPC bindings when the C++ coroutine "
+        "runtime required by thrift.py3 is unavailable.",
+        "",
+    },
+    {
+        "py3cpp",
+        "py3cpp",
+        generator_option_value_policy::flag,
+        "Reference companion C++ code under gen-py3cpp instead of gen-cpp2. "
+        "The C++ generator must be invoked separately with cpp2:py3cpp.",
+        "",
+    },
+    {
+        "python_capi_converter",
+        "python_capi_converter",
+        generator_option_value_policy::flag,
+        "Generate conversion hooks for the thrift.python C API bridge.",
+        "",
+    },
+    {
+        "single_file_service",
+        "single_file_service",
+        generator_option_value_policy::flag,
+        "Emit the module-level service artifact set even when the IDL has no "
+        "services, so build systems can use a fixed output contract.",
+        "",
+    },
+    {
+        "stack_arguments",
+        "stack_arguments",
+        generator_option_value_policy::flag,
+        "Match cpp2 stack-argument handler signatures in generated Cython/C++ "
+        "service glue. Use the same setting for the companion C++ generation.",
+        "",
+    },
+};
+
+std::string py3_generator_documentation() {
+  return make_generator_documentation(
+      "Generate Cython-backed Python 3 types and RPC bindings for the "
+      "thrift.py3 runtime, together with their C++ extension glue, in gen-py3.",
+      "thrift1 --gen 'py3[:OPTION[,...]]' FILE",
+      kPy3GeneratorOptions);
+}
+
 std::vector<const t_function*> lifecycleFunctions() {
   static t_function onStartServing_{
       nullptr, t_primitive_type::t_void(), "onStartServing"};
@@ -674,6 +773,12 @@ void py3_generator_context::visit_function(const t_function& function) {
 class t_mstch_py3_generator : public t_whisker_generator {
  public:
   using t_whisker_generator::t_whisker_generator;
+
+  void process_options(
+      const std::map<std::string, std::string>& options) override {
+    validate_generator_options("py3", options, kPy3GeneratorOptions);
+    t_whisker_generator::process_options(options);
+  }
 
   void generate_program() override {
     generate_root_path_ = package_to_path();
@@ -1606,9 +1711,6 @@ void t_mstch_py3_generator::generate_services() {
 
 } // namespace
 
-THRIFT_REGISTER_GENERATOR(
-    mstch_py3,
-    "Python 3",
-    "include_prefix:  Use full include paths in generated files.");
+THRIFT_REGISTER_GENERATOR(mstch_py3, "Python 3", py3_generator_documentation());
 
 } // namespace apache::thrift::compiler

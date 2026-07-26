@@ -229,14 +229,43 @@ Options:
 
 Available generators (and options):
 )");
-  for (const auto& gen : generator_registry::get_generators()) {
-    const generator_factory& generator_factory = *gen.second;
-    fmt::print(
-        stream,
-        "  {} ({}):\n{}",
-        generator_factory.name(),
-        generator_factory.long_name(),
-        generator_factory.documentation());
+  const auto& generators = generator_registry::get_generators();
+  const auto& aliases = generator_registry::get_generator_aliases();
+  std::set<std::string> aliased_implementations;
+  for (const auto& [alias, implementation] : aliases) {
+    aliased_implementations.insert(implementation);
+  }
+
+  std::map<std::string, std::pair<const generator_factory*, std::string>>
+      displayed_generators;
+  for (const auto& [name, factory] : generators) {
+    if (!aliased_implementations.contains(name)) {
+      displayed_generators.emplace(name, std::pair{factory, std::string{}});
+    }
+  }
+  for (const auto& [alias, implementation] : aliases) {
+    if (const auto it = generators.find(implementation);
+        it != generators.end()) {
+      displayed_generators.emplace(
+          alias, std::pair{it->second, implementation});
+    }
+  }
+
+  for (const auto& [name, display] : displayed_generators) {
+    const generator_factory& generator_factory = *display.first;
+    if (name == generator_factory.long_name()) {
+      fmt::print(stream, "  {}:\n{}", name, generator_factory.documentation());
+    } else {
+      fmt::print(
+          stream,
+          "  {} ({}):\n{}",
+          name,
+          generator_factory.long_name(),
+          generator_factory.documentation());
+    }
+    if (!display.second.empty()) {
+      fmt::print(stream, "    Legacy name: {}\n", display.second);
+    }
   }
 }
 
@@ -426,11 +455,13 @@ generator_specs parse_generator_specs(const std::string& target) {
   std::string name = target.substr(0, colon_pos);
 
   std::map<std::string, std::string> options;
-  parse_generator_options(
-      target.substr(colon_pos + 1), [&](std::string k, std::string v) {
-        options.emplace(std::move(k), std::move(v));
-        return parse_control::more;
-      });
+  if (colon_pos != std::string::npos) {
+    parse_generator_options(
+        target.substr(colon_pos + 1), [&](std::string k, std::string v) {
+          options.emplace(std::move(k), std::move(v));
+          return parse_control::more;
+        });
+  }
   return {std::move(name), std::move(options)};
 }
 
@@ -635,7 +666,8 @@ std::string get_include_path(
       continue;
     }
     const auto lang_name = target.substr(0, colon_pos);
-    if (lang_name != "cpp2" && lang_name != "mstch_cpp2") {
+    if (lang_name != "cpp" && lang_name != "cpp2" &&
+        lang_name != "mstch_cpp2") {
       continue;
     }
 
@@ -873,10 +905,11 @@ std::string parse_args(
       // no-op
     } else if (flag == "allow-64bit-consts") {
       pparams.allow_64bit_consts = true;
-    } else if (maybe_parse_boolean_flag(
-                   flag,
-                   /*prefix=*/"allow-self-relative-includes",
-                   &pparams.allow_self_relative_includes)) {
+    } else if (
+        maybe_parse_boolean_flag(
+            flag,
+            /*prefix=*/"allow-self-relative-includes",
+            &pparams.allow_self_relative_includes)) {
       continue;
     } else if (flag == "record-genfiles") {
       const std::string* arg = consume_arg("genfile file specification");

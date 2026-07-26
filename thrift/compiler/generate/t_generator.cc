@@ -16,6 +16,8 @@
 
 #include <thrift/compiler/generate/t_generator.h>
 
+#include <algorithm>
+#include <sstream>
 #include <stdexcept>
 #include <utility>
 
@@ -41,7 +43,87 @@ std::string normalize_documentation(std::string_view doc) {
   }
   return out.str();
 }
+
+void append_indented(std::string& output, std::string_view text) {
+  while (!text.empty()) {
+    const auto line_end = text.find('\n');
+    const auto line = text.substr(0, line_end);
+    output.append("  ");
+    output.append(line);
+    output.push_back('\n');
+    if (line_end == std::string_view::npos) {
+      break;
+    }
+    text.remove_prefix(line_end + 1);
+  }
+}
 } // namespace
+
+std::string make_generator_documentation(
+    std::string_view introduction,
+    std::string_view usage,
+    std::span<const generator_option_spec> options) {
+  std::string result{introduction};
+  result.append("\n\nUsage: ");
+  result.append(usage);
+  result.append(
+      "\nOptions are comma-separated and disabled by default unless stated."
+      "\n\n");
+  for (const auto& option : options) {
+    result.append(option.usage);
+    result.push_back('\n');
+    append_indented(result, option.description);
+#ifndef THRIFT_OSS
+    if (!option.internal_documentation.empty()) {
+      append_indented(
+          result,
+          fmt::format(
+              "Internal documentation: {}", option.internal_documentation));
+    }
+#endif
+  }
+  return result;
+}
+
+void validate_generator_options(
+    std::string_view language,
+    const std::map<std::string, std::string>& options,
+    std::span<const generator_option_spec> supported_options) {
+  for (const auto& [name, value] : options) {
+    const auto option = std::find_if(
+        supported_options.begin(),
+        supported_options.end(),
+        [&](const auto& candidate) { return candidate.name == name; });
+    if (option == supported_options.end()) {
+      throw std::runtime_error(
+          fmt::format(
+              "Unknown {} generator option `{}`; run `thrift1 --help` for the "
+              "supported options",
+              language,
+              name));
+    }
+    switch (option->value_policy) {
+      case generator_option_value_policy::flag:
+        if (!value.empty()) {
+          throw std::runtime_error(
+              fmt::format(
+                  "{} generator option `{}` does not take a value",
+                  language,
+                  name));
+        }
+        break;
+      case generator_option_value_policy::required:
+        if (value.empty()) {
+          throw std::runtime_error(
+              fmt::format(
+                  "{} generator option `{}` requires a value", language, name));
+        }
+        break;
+      case generator_option_value_policy::optional:
+        break;
+    }
+  }
+}
 
 void t_generator::process_options(
     const std::map<std::string, std::string>& options,
@@ -77,7 +159,11 @@ std::unique_ptr<t_generator> generator_registry::make_generator(
     t_program_bundle& pb,
     diagnostics_engine& diags) {
   generator_map& map = get_generators();
-  auto iter = map.find(name);
+  const auto& aliases = get_generator_aliases();
+  const auto alias = aliases.find(name);
+  const std::string& registered_name =
+      alias == aliases.end() ? name : alias->second;
+  auto iter = map.find(registered_name);
   return iter != map.end() ? iter->second->make_generator(p, pb, diags)
                            : nullptr;
 }
@@ -86,6 +172,17 @@ generator_registry::generator_map& generator_registry::get_generators() {
   // http://www.parashift.com/c++-faq-lite/ctors.html#faq-10.12
   static generator_map* map = new generator_map();
   return *map;
+}
+
+const generator_registry::generator_alias_map&
+generator_registry::get_generator_aliases() {
+  static const generator_alias_map* aliases = new generator_alias_map{
+      {"cpp", "mstch_cpp2"},
+      {"cpp2", "mstch_cpp2"},
+      {"py3", "mstch_py3"},
+      {"python", "mstch_python"},
+  };
+  return *aliases;
 }
 
 } // namespace apache::thrift::compiler

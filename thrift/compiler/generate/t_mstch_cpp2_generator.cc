@@ -17,8 +17,11 @@
 #include <algorithm>
 #include <cassert>
 #include <filesystem>
+#include <iterator>
 #include <memory>
 #include <queue>
+#include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -49,6 +52,275 @@ namespace {
 
 using compiler_options_map = std::map<std::string, std::string, std::less<>>;
 using apache::thrift::compiler::detail::schematizer;
+
+// This table is the single source of truth for both cpp2 option validation and
+// `thrift1 --help`. Keep operational build/link implications here; otherwise an
+// option can appear to work while producing an incomplete static-library link.
+constexpr generator_option_spec kCpp2GeneratorOptions[] = {
+    {
+        "any",
+        "any",
+        generator_option_value_policy::flag,
+        "Register URI-bearing structured types with AnyRegistry for Binary "
+        "and Compact; add SimpleJson when json is also enabled. The generated "
+        "<module>_sinit.cpp must be retained by static-library links.",
+        "",
+    },
+    {
+        "client_cpp_splits",
+        "client_cpp_splits={<service>:<count>[,...]}",
+        generator_option_value_policy::required,
+        "Split each named service's AsyncClient implementation into <count> "
+        "files named <service>.<id>.async_client_split.cpp. Counts must be "
+        "positive and no greater than that service's method count.",
+        "",
+    },
+    {
+        "deprecated_clear",
+        "deprecated_clear",
+        generator_option_value_policy::flag,
+        "Make generated clear operations assign standard defaults instead of "
+        "intrinsic defaults. This preserves legacy behavior and is not "
+        "recommended for new code.",
+        "",
+    },
+    {
+        "deprecated_enforce_required",
+        "deprecated_enforce_required",
+        generator_option_value_policy::flag,
+        "Reject payloads which omit required fields during deserialization. "
+        "Required fields and this enforcement mode are deprecated.",
+        "",
+    },
+    {
+        "deprecated_public_required_fields",
+        "deprecated_public_required_fields",
+        generator_option_value_policy::flag,
+        "Expose required-field storage as public members and suppress the "
+        "corresponding unsuffixed reference accessors. This is legacy, unsafe "
+        "API compatibility.",
+        "",
+    },
+    {
+        "deprecated_private_fields_for_cpp_ref",
+        "deprecated_private_fields_for_cpp_ref",
+        generator_option_value_policy::flag,
+        "Accepted as a compatibility no-op. cpp.Ref storage is always private.",
+        "",
+    },
+    {
+        "disable_custom_type_ordering_if_structure_has_uri",
+        "disable_custom_type_ordering_if_structure_has_uri",
+        generator_option_value_policy::flag,
+        "Accepted as a compatibility no-op. Its behavior is always enabled: "
+        "custom set/map types are not assumed orderable merely because the "
+        "containing structure has a URI.",
+        "",
+    },
+    {
+        "frozen",
+        "frozen[=packed]",
+        generator_option_value_policy::optional,
+        "Generate legacy Frozen (Frozen1) support. frozen=packed also packs "
+        "generated structures at alignment 1. This feature is not actively "
+        "maintained; packed mode can impose unaligned-access costs.",
+        "",
+    },
+    {
+        "frozen2",
+        "frozen2",
+        generator_option_value_policy::flag,
+        "Generate <module>_layouts.h and <module>_layouts.cpp for Frozen2. "
+        "Consumers using a layout must compile/link the layout translation "
+        "unit. This feature is opt-in and not actively maintained.",
+#ifdef THRIFT_OSS
+        "",
+#else
+        "https://fburl.com/thrift_frozen2",
+#endif
+    },
+    {
+        "includes",
+        "includes=<header>[:<header>...]",
+        generator_option_value_policy::required,
+        "Add verbatim C++ include operands to generated type, client, and "
+        "handler headers. Each value must include its delimiters, for example "
+        "<vector> or \"project/header.h\".",
+        "",
+    },
+    {
+        "include_prefix",
+        "include_prefix=<path>",
+        generator_option_value_policy::required,
+        "Override the prefix used by generated #include directives. It does "
+        "not move output files; build-system include roots must agree with "
+        "<path>/gen-cpp2 (or gen-py3cpp).",
+        "",
+    },
+    {
+        "json",
+        "json",
+        generator_option_value_policy::flag,
+        "Generate SimpleJSON reader/writer instantiations. This increases "
+        "generated code and compile time; enable it only for targets which use "
+        "SimpleJSON.",
+        "",
+    },
+    {
+        "no_getters_setters",
+        "no_getters_setters",
+        generator_option_value_policy::flag,
+        "Suppress deprecated generated get_* and set_* methods. Prefer field "
+        "reference accessors such as field() and field_ref().",
+        "",
+    },
+    {
+        "no_metadata",
+        "no_metadata",
+        generator_option_value_policy::flag,
+        "Do not emit <module>_metadata.cpp. The minimal metadata header is "
+        "still generated. Use only when no consumer needs legacy module "
+        "metadata definitions.",
+        "",
+    },
+    {
+        "nimble",
+        "nimble",
+        generator_option_value_policy::flag,
+        "Accepted as a compatibility no-op. The experimental Nimble codegen "
+        "path is no longer present.",
+        "",
+    },
+    {
+        "py3cpp",
+        "py3cpp",
+        generator_option_value_policy::flag,
+        "Write the C++ output under gen-py3cpp instead of gen-cpp2. This only "
+        "changes the C++ output/include directory; it does not generate Python "
+        "bindings.",
+        "",
+    },
+    {
+        "reflection",
+        "reflection",
+        generator_option_value_policy::flag,
+        "Accepted as a compatibility no-op. Legacy Fatal *_fatal*.h codegen "
+        "was removed; current inline C++ reflection metadata is generated "
+        "without an option.",
+        "",
+    },
+    {
+        "service_cpp_splits",
+        "service_cpp_splits={<service>:<count>[,...]}",
+        generator_option_value_policy::required,
+        "Accepted as a compatibility no-op. It does not split current service "
+        "implementations; use client_cpp_splits for AsyncClient sources.",
+        "",
+    },
+    {
+        "single_file_service",
+        "single_file_service",
+        generator_option_value_policy::flag,
+        "Generate module-level <module>_clients.cpp and "
+        "<module>_handlers.cpp instead of per-service implementation files. "
+        "It is incompatible with client_cpp_splits.",
+        "",
+    },
+    {
+        "stack_arguments",
+        "stack_arguments",
+        generator_option_value_policy::flag,
+        "Pass generated server-handler arguments by reference instead of "
+        "moving complex values through owning pointers. This changes the "
+        "generated handler ABI; cpp.stack_arguments=0 can opt out per method.",
+        "",
+    },
+    {
+        "sync_methods_return_try",
+        "sync_methods_return_try",
+        generator_option_value_policy::flag,
+        "Generate deprecated sync_complete_* client methods returning "
+        "folly::Try<RpcResponseComplete<T>> for eligible non-oneway, non-sink "
+        "RPCs.",
+        "",
+    },
+    {
+        "tablebased",
+        "tablebased",
+        generator_option_value_policy::flag,
+        "Use generated table-based serialization metadata. It is incompatible "
+        "with @cpp.PackIsset structures.",
+        "",
+    },
+    {
+        "templates",
+        "templates",
+        generator_option_value_policy::flag,
+        "Accepted as a compatibility no-op. The modern C++ generator always "
+        "uses its bundled templates; this marker remains in older CMake and "
+        "Buck-generated invocations.",
+        "",
+    },
+    {
+        "types_cpp_splits",
+        "types_cpp_splits=<count>",
+        generator_option_value_policy::required,
+        "Split each of the four type implementation families into <count> "
+        "numbered .split.cpp files. The count must be positive and no greater "
+        "than the module's structured-type plus enum count.",
+        "",
+    },
+    {
+        "visitation",
+        "visitation",
+        generator_option_value_policy::flag,
+        "Accepted as a compatibility no-op. Legacy visitation option-gated "
+        "codegen was removed.",
+        "",
+    },
+};
+
+std::string cpp2_generator_documentation() {
+  return make_generator_documentation(
+      "Generate modern C++ types, serialization, clients, and servers in "
+      "gen-cpp2. The public names cpp and cpp2 are equivalent; mstch_cpp2 is "
+      "the legacy implementation name.\n\n"
+      "Schema injection is the global --inject-schema-const compiler flag, "
+      "not a generator option. It requires the stage-2 schema-enabled thrift1.",
+      "thrift1 --gen 'cpp2[:OPTION[,...]]' FILE",
+      kCpp2GeneratorOptions);
+}
+
+void validate_cpp2_generator_options(
+    const std::map<std::string, std::string>& options) {
+  if (options.contains("schema")) {
+    throw std::runtime_error(
+        "`schema` is not a cpp2 generator option; use the global "
+        "`--inject-schema-const` flag with the stage-2 thrift1 compiler");
+  }
+  for (std::string_view marker : {"layouts", "patch"}) {
+    if (options.contains(std::string(marker))) {
+      throw std::runtime_error(
+          fmt::format(
+              "`{}` is a thrift_generate() CMake marker, not a cpp2 generator "
+              "option",
+              marker));
+    }
+  }
+  validate_generator_options("cpp2", options, kCpp2GeneratorOptions);
+  if (const auto frozen = options.find("frozen"); frozen != options.end() &&
+      !frozen->second.empty() && frozen->second != "packed") {
+    throw std::runtime_error(
+        "cpp2 generator option `frozen` accepts only `frozen` or "
+        "`frozen=packed`");
+  }
+  if (options.contains("single_file_service") &&
+      options.contains("client_cpp_splits")) {
+    throw std::runtime_error(
+        "cpp2 generator options `single_file_service` and "
+        "`client_cpp_splits` are incompatible");
+  }
+}
 
 // A compiler counterpart of cpp.EnumUnderlyingType that avoids dependency on
 // the generated code and follows the compiler naming conventions.
@@ -715,8 +987,14 @@ int get_split_count(const compiler_options_map& options) {
   if (iter == options.end()) {
     return 0;
   }
-  return checked_stoi(
+  const int split_count = checked_stoi(
       iter->second, "Invalid types_cpp_splits value: `" + iter->second + "`");
+  if (split_count <= 0) {
+    throw std::runtime_error(
+        "Invalid types_cpp_splits value: `" + iter->second +
+        "` (the split count must be positive)");
+  }
+  return split_count;
 }
 
 bool needs_op_encode(const t_type& type);
@@ -803,8 +1081,21 @@ class t_mstch_cpp2_generator : public t_whisker_generator {
 
   void process_options(
       const std::map<std::string, std::string>& options) override {
+    validate_cpp2_generator_options(options);
     t_whisker_generator::process_options(options);
     client_name_to_split_count_ = get_client_name_to_split_count();
+    for (const auto& entry : client_name_to_split_count_) {
+      const auto& service_name = entry.first;
+      const auto& services = program_->services();
+      if (std::none_of(
+              services.begin(), services.end(), [&](const auto* service) {
+                return service->name() == service_name;
+              })) {
+        throw std::runtime_error(
+            fmt::format(
+                "client_cpp_splits names unknown service `{}`", service_name));
+      }
+    }
     out_dir_base_ = get_out_dir_base(compiler_options());
   }
 
@@ -2513,7 +2804,8 @@ t_mstch_cpp2_generator::get_client_name_to_split_count() const {
   }
   map = map.substr(1, map.size() - 2);
   if (map.empty()) {
-    return {};
+    throw std::runtime_error(
+        "Invalid client_cpp_splits value: the service map is empty");
   }
   std::unordered_map<std::string, int> ret;
   for (const auto& kv : split(map, ',')) {
@@ -2523,10 +2815,25 @@ t_mstch_cpp2_generator::get_client_name_to_split_count() const {
           fmt::format(
               "Invalid pair `{}` in client_cpp_splits value: `{}`", kv, map));
     }
-    ret[a[0]] = checked_stoi(
+    const int split_count = checked_stoi(
         a[1],
         fmt::format(
             "Invalid pair `{}` in client_cpp_splits value: `{}`", kv, map));
+    if (a[0].empty() || split_count <= 0) {
+      throw std::runtime_error(
+          fmt::format(
+              "Invalid pair `{}` in client_cpp_splits value: `{}`; service names "
+              "must be non-empty and split counts must be positive",
+              kv,
+              map));
+    }
+    if (!ret.emplace(a[0], split_count).second) {
+      throw std::runtime_error(
+          fmt::format(
+              "Duplicate service `{}` in client_cpp_splits value: `{}`",
+              a[0],
+              map));
+    }
   }
   return ret;
 }
@@ -2699,66 +3006,7 @@ void t_mstch_cpp2_generator::fill_validator_visitors(
   validator.add_field_visitor(validate_lazy_fields);
 }
 
-THRIFT_REGISTER_GENERATOR(
-    mstch_cpp2, "cpp2", R"((NOTE: the list below may not be exhaustive)
-any
-  Register types with the AnyRegistry.
-client_cpp_splits={[<service name:str>:<split count:int>[,...]*]}
-  Enable splitting of client method .cpp files (into N
-  *.async_client_split.cpp" files). The given split count cannot be greater
-  than the number of methods in the corresponding service. See also
-  types_cpp_splits below.
-deprecated_clear
-  Use the deprecated semantics for "clearing" Thrift structs, which assigns
-  the *standard* default value instead of the *intrinsic* defaults (see
-  https://github.com/facebook/fbthrift/blob/main/thrift/doc/idl/index.md#default-values).
-deprecated_enforce_required
-  Enforce required fields (deprecated since 2019).
-deprecated_public_required_fields
-  Make member variables corresponding to required fields public instead of
-  private. In addition to exposing directly the field (which is unsafe to
-  begin with), this prevents the generation of the reference accessors
-  that do not have the _ref() suffix.
-disable_custom_type_ordering_if_structure_has_uri (IGNORED - ALWAYS SET)
-  Without this option, custom set/map are considered orderable if parent structure has uri.
-frozen[=packed]
-  Enable frozen structs. If the packed parameter is given, structure members
-  will be packed with an alignment of 1 (i.e., #pragma pack(push, 1)).
-  NOTE: this capability is not actively maintained. Use at your own risks.
-frozen2
-  Enable frozen2 (see https://fburl.com/thrift_frozen2).
-  NOTE: this capability is not actively maintained. Use at your own risks.
-includes=<extra_include:str>:...
-  Add cpp_include for each of the given values.
-include_prefix
-  Override the "include prefix" for all generated files, i.e. the directory
-  from which application code should include headers, typically:
-  <include_prefix>/gen-cpp2/...
-json
-  Enable SimpleJson serialization.
-no_getters_setters
-  Do not generate (deprecated) field getter and setter methods, even when
-  it would be possible to do so. This is enouraged, and eventually will be
-  enabled by default as getters and setters are deprecated in favor of field
-  references (i.e., field() or field_ref() methods). Other conditions that
-  would prevent getters/setters from being generated (even if this option is
-  not enabled) include if the corresponding field: is a reference field
-  (@cpp.Ref), is adapted (@cpp.Adapter), is lazy (@cpp.Lazy), has a
-  @cpp.FieldIntercaptor or is terse.
-no_metadata
-  Generate empty metadata, do not generate _metadata.cpp.
-py3cpp
-  if specified, output folder is "gen-py3cpp" instead of "gen-cpp2".
-single_file_service
-  Generate all RPC services and client code in a single file, respectively.
-sync_methods_return_try
-  Generate (deprecated) sync code for RPC methods that returns a folly::Try.
-tablebased
-  Enable the table-based serialization.
-types_cpp_splits=<split_count:int>
-  Enable splitting of type .cpp files (into the given number of files).
-  Cannot be greater than the number of objects. See also client_cpp_splits
-  above.)");
+THRIFT_REGISTER_GENERATOR(mstch_cpp2, "cpp2", cpp2_generator_documentation());
 
 } // namespace
 } // namespace apache::thrift::compiler

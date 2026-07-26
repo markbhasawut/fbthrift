@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <filesystem>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -44,6 +45,97 @@ using ::apache::thrift::type::BaseType;
 namespace apache::thrift::compiler {
 
 namespace {
+
+constexpr generator_option_spec kPythonGeneratorOptions[] = {
+    {
+        "auto_migrate",
+        "auto_migrate",
+        generator_option_value_policy::flag,
+        "Enable compatibility hooks used while migrating from thrift.py3 to "
+        "thrift.python generated types and clients.",
+        "",
+    },
+    {
+        "avoid_enum_metadata_circular_reference",
+        "avoid_enum_metadata_circular_reference",
+        generator_option_value_policy::flag,
+        "Resolve enum metadata lazily to avoid circular imports between "
+        "thrift_enums.py and thrift_metadata.py.",
+        "",
+    },
+    {
+        "base_library_package",
+        "base_library_package=<module>",
+        generator_option_value_policy::required,
+        "Override the runtime package imported by generated bindings. The "
+        "default is thrift.python.",
+        "",
+    },
+    {
+        "disable_field_cache",
+        "disable_field_cache",
+        generator_option_value_policy::flag,
+        "Disable generated field-value caching for every structure in the "
+        "module. This reduces retained memory but repeats conversions.",
+        "",
+    },
+    {
+        "does_not_have_py_deprecated",
+        "does_not_have_py_deprecated",
+        generator_option_value_policy::flag,
+        "Do not generate migration paths that import the legacy thrift.py "
+        "module.",
+        "",
+    },
+    {
+        "does_not_have_py_deprecated_asyncio",
+        "does_not_have_py_deprecated_asyncio",
+        generator_option_value_policy::flag,
+        "Do not generate migration paths that import the legacy "
+        "thrift.py asyncio module.",
+        "",
+    },
+    {
+        "enable_isset_deprecated_unsafe",
+        "enable_isset_deprecated_unsafe[=1]",
+        generator_option_value_policy::optional,
+        "Track legacy isset bits for all eligible structures. This changes the "
+        "internal data tuple and disables unsafe fast-comparison paths.",
+        "",
+    },
+    {
+        "include_prefix",
+        "include_prefix=<path>",
+        generator_option_value_policy::required,
+        "Override the source include prefix recorded on the program for "
+        "generated integration code. It does not move gen-python output.",
+        "",
+    },
+    {
+        "no_metadata",
+        "no_metadata",
+        generator_option_value_policy::flag,
+        "Do not emit thrift_metadata.py. Enum and type templates also omit "
+        "metadata integration.",
+        "",
+    },
+    {
+        "root_module_prefix",
+        "root_module_prefix=<module>",
+        generator_option_value_policy::required,
+        "Prepend a Python module path to generated imports without changing "
+        "the gen-python filesystem layout.",
+        "",
+    },
+};
+
+std::string python_generator_documentation() {
+  return make_generator_documentation(
+      "Generate pure-Python types, clients, services, metadata, and reflection "
+      "modules for the thrift.python runtime in gen-python.",
+      "thrift1 --gen 'python[:OPTION[,...]]' FILE",
+      kPythonGeneratorOptions);
+}
 
 enum class types_file_kind { not_a_types_file, source_file, type_stub };
 enum class type_kind { abstract, immutable, mutable_ };
@@ -1367,6 +1459,19 @@ class t_mstch_python_generator : public t_mstch_python_prototypes_generator {
   using t_mstch_python_prototypes_generator::
       t_mstch_python_prototypes_generator;
 
+  void process_options(
+      const std::map<std::string, std::string>& options) override {
+    validate_generator_options("python", options, kPythonGeneratorOptions);
+    if (const auto isset = options.find("enable_isset_deprecated_unsafe");
+        isset != options.end() && !isset->second.empty() &&
+        isset->second != "1") {
+      throw std::runtime_error(
+          "python generator option `enable_isset_deprecated_unsafe` accepts "
+          "only the flag form or `=1`");
+    }
+    t_mstch_python_prototypes_generator::process_options(options);
+  }
+
   std::string template_prefix() const override { return "python"; }
 
   void generate_program() override {
@@ -1587,13 +1692,7 @@ class t_python_patch_generator : public t_mstch_python_prototypes_generator {
 } // namespace
 
 THRIFT_REGISTER_GENERATOR(
-    mstch_python,
-    "Python",
-    R"(include_prefix:  Use full include paths in generated files.
-does_not_have_py_deprecated:
-  Specify that the generated code does not have thrift-py-deprecated.
-does_not_have_py_deprecated_asyncio:
-  Specify that the generated code does not have thrift-py-deprecated-asyncio.)");
+    mstch_python, "Python", python_generator_documentation());
 
 namespace patch {
 THRIFT_REGISTER_GENERATOR(

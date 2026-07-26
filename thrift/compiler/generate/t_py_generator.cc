@@ -43,6 +43,96 @@ namespace apache::thrift::compiler {
 
 namespace {
 
+constexpr generator_option_spec kPyGeneratorOptions[] = {
+    {
+        "asyncio",
+        "asyncio",
+        generator_option_value_policy::flag,
+        "Generate asyncio-compatible clients and processors. If namespace "
+        "py.asyncio is present, it replaces namespace py for output and "
+        "imports. This is incompatible with cpp_transport.",
+        "",
+    },
+    {
+        "compare_t_fields_only",
+        "compare_t_fields_only",
+        generator_option_value_policy::flag,
+        "Compare only declared Thrift fields instead of the complete Python "
+        "instance dictionary. This changes equality and ordering semantics.",
+        "",
+    },
+    {
+        "cpp_transport",
+        "cpp_transport",
+        generator_option_value_policy::flag,
+        "Generate client integration with the legacy C++ transport bridge. "
+        "This is incompatible with asyncio.",
+        "",
+    },
+    {
+        "future",
+        "future",
+        generator_option_value_policy::flag,
+        "Generate concurrent.futures-based service interfaces and processors.",
+        "",
+    },
+    {
+        "json",
+        "json",
+        generator_option_value_policy::flag,
+        "Generate readFromJson helpers for enums, structures, and containers.",
+        "",
+    },
+    {
+        "new_style",
+        "new_style",
+        generator_option_value_policy::flag,
+        "Accepted as a compatibility no-op. Old-style class generation was "
+        "removed; generated classes always use the current class model.",
+        "",
+    },
+    {
+        "slots",
+        "slots",
+        generator_option_value_policy::flag,
+        "Store generated structure fields in __slots__ instead of __dict__. "
+        "This reduces per-instance memory but prevents arbitrary attributes.",
+        "",
+    },
+    {
+        "sort_keys",
+        "sort_keys",
+        generator_option_value_policy::flag,
+        "Serialize maps sorted by key and sets sorted by value for deterministic "
+        "wire output, at an O(n log n) CPU cost.",
+        "",
+    },
+    {
+        "thrift_port",
+        "thrift_port=<port>",
+        generator_option_value_policy::required,
+        "Set the default port embedded in generated remote-client scripts. The "
+        "default is 9090.",
+        "",
+    },
+    {
+        "utf8strings",
+        "utf8strings",
+        generator_option_value_policy::flag,
+        "Decode Thrift string values as UTF-8 text. Python 3 generated code "
+        "enables this behavior regardless of the option.",
+        "",
+    },
+};
+
+std::string py_generator_documentation() {
+  return make_generator_documentation(
+      "Generate pure-Python types and RPC bindings for the legacy Thrift "
+      "Python runtime in gen-py.",
+      "thrift1 --gen 'py[:OPTION[,...]]' FILE",
+      kPyGeneratorOptions);
+}
+
 const std::string* get_py_adapter(const t_type* type) {
   if (!type->get_true_type()->is<t_struct>() &&
       !type->get_true_type()->is<t_union>()) {
@@ -94,6 +184,7 @@ class t_py_generator : public t_concat_generator {
 
   void process_options(
       const std::map<std::string, std::string>& options) override {
+    validate_generator_options("py", options, kPyGeneratorOptions);
     gen_json_ = options.find("json") != options.end();
     gen_slots_ = options.find("slots") != options.end();
     gen_asyncio_ = options.find("asyncio") != options.end();
@@ -1006,8 +1097,11 @@ string t_py_generator::py_par_warning(const string& service_tool_name) {
       "        *-" +
       service_tool_name +
       ".par.\n"
+#ifndef THRIFT_OSS
       "        For more information, please read\n"
-      "        http://fburl.com/python-remotes\"\"\")\n"
+      "        http://fburl.com/python-remotes\n"
+#endif
+      "        \"\"\")\n"
       "        exit()\n";
 }
 
@@ -3939,15 +4033,7 @@ int32_t t_py_generator::get_thrift_spec_key(
   return f->id() + offset;
 }
 
-THRIFT_REGISTER_GENERATOR(
-    py,
-    "Python",
-    R"(json:            Generate function to parse entity from json
-slots:           Generate code using slots for instance members.
-sort_keys:       Serialize maps sorted by key and sets by value.
-thrift_port=NNN: Default port to use in remote client (default 9090).
-asyncio:         Generate asyncio-friendly RPC services.
-utf8strings:     Encode/decode strings using utf8 in the generated code.)");
+THRIFT_REGISTER_GENERATOR(py, "Python", py_generator_documentation());
 
 } // namespace
 

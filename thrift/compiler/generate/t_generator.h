@@ -19,6 +19,7 @@
 #include <filesystem>
 #include <map>
 #include <memory>
+#include <span>
 #include <string>
 #include <string_view>
 #include <unordered_set>
@@ -29,6 +30,37 @@ namespace apache::thrift::compiler {
 
 class t_program;
 class t_program_bundle;
+
+enum class generator_option_value_policy { flag, required, optional };
+
+struct generator_option_spec {
+  std::string_view name;
+  std::string_view usage;
+  generator_option_value_policy value_policy;
+  std::string_view description;
+  std::string_view internal_documentation;
+};
+
+/**
+ * Builds the option reference printed by `thrift1 --help`.
+ *
+ * `internal_documentation` is omitted from OSS binaries. This keeps the option
+ * contract shared without leaking Meta-only URLs into public help output.
+ */
+std::string make_generator_documentation(
+    std::string_view introduction,
+    std::string_view usage,
+    std::span<const generator_option_spec> options);
+
+/**
+ * Rejects unknown options and enforces flag/required-value syntax.
+ * Language-specific semantic constraints remain the generator's
+ * responsibility after this common validation step.
+ */
+void validate_generator_options(
+    std::string_view language,
+    const std::map<std::string, std::string>& options,
+    std::span<const generator_option_spec> supported_options);
 
 class t_generator {
  public:
@@ -166,6 +198,10 @@ std::unique_ptr<t_generator> make_generator(
 // A map from generator names to factories.
 using generator_map = std::map<std::string, generator_factory*>;
 generator_map& get_generators();
+
+// User-facing generator names mapped to their legacy implementation names.
+using generator_alias_map = std::map<std::string, std::string>;
+const generator_alias_map& get_generator_aliases();
 
 } // namespace generator_registry
 

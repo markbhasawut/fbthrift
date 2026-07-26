@@ -135,6 +135,7 @@ set(THRIFT_TEST_SERVICES_SplitsTest Service1 Service2)
 set(THRIFT_TEST_SERVICES_ThriftTest ThriftTest SecondService)
 
 set(THRIFT_TEST_OPTIONS_cpp_name "json")
+set(THRIFT_TEST_OPTIONS_CppAllocatorTest "json")
 set(THRIFT_TEST_OPTIONS_Recursive "json")
 set(THRIFT_TEST_OPTIONS_Recursive2 "json")
 set(THRIFT_TEST_OPTIONS_schema_evolution_test "json")

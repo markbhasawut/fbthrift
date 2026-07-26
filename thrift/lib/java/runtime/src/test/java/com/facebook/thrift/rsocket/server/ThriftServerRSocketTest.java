@@ -36,6 +36,7 @@ import io.netty.buffer.ByteBufAllocator;
 import io.rsocket.Payload;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
+import java.util.function.Consumer;
 import java.util.stream.Stream;
 import org.apache.thrift.ErrorBlame;
 import org.apache.thrift.PayloadExceptionMetadataBase;
@@ -236,6 +237,16 @@ public class ThriftServerRSocketTest {
         streamMetadata.getPayloadMetadata().getResponseMetadata());
   }
 
+  private static Consumer<Payload> releasing(Consumer<Payload> assertion) {
+    return payload -> {
+      try {
+        assertion.accept(payload);
+      } finally {
+        payload.release();
+      }
+    };
+  }
+
   @ParameterizedTest
   @MethodSource("data")
   public void testRequestResponse(ProtocolId protocolId) {
@@ -246,12 +257,12 @@ public class ThriftServerRSocketTest {
 
     StepVerifier.create(rocket.requestResponse(request))
         .assertNext(
-            response -> {
+            releasing(response -> {
               assertRpcMetadataIsDefault(response);
               TestResponse result = getTestResponse(requestMetadata, response);
               assertEquals(5, result.getIntField());
               assertEquals("foo", result.getStrField());
-            })
+            }))
         .verifyComplete();
   }
 
@@ -266,10 +277,10 @@ public class ThriftServerRSocketTest {
 
     StepVerifier.create(rocket.requestResponse(request))
         .assertNext(
-            response -> {
+            releasing(response -> {
               assertRpcMedatadataHasDeclaredException(response, expectedName, expectedWhat);
               payloadAssertion.accept(requestMetadata.getProtocol(), response);
-            })
+            }))
         .verifyComplete();
   }
 
@@ -316,12 +327,12 @@ public class ThriftServerRSocketTest {
 
     StepVerifier.create(rocket.requestResponse(request))
         .assertNext(
-            response -> {
+            releasing(response -> {
               assertRpcMetadataIsDefault(response);
               assertEquals(5, TestServiceHandler.inputParameter.getIntField());
               assertEquals("foo", TestServiceHandler.inputParameter.getStrField());
               assertDataIsEmpty(response);
-            })
+            }))
         .verifyComplete();
   }
 
@@ -336,21 +347,21 @@ public class ThriftServerRSocketTest {
     StepVerifier.Step<Payload> steps =
         StepVerifier.create(rocket.requestStream(request))
             .assertNext(
-                response -> {
+                releasing(response -> {
                   assertRpcMetadataIsDefault(response);
                   assertDataIsEmpty(response);
-                });
+                }));
 
     final AtomicInteger counter = new AtomicInteger();
     for (int i = 0; i < 10; i++) {
       steps.assertNext(
-          response -> {
+          releasing(response -> {
             assertStreamMetadataIsDefault(response);
 
             TestResponse result = getTestResponse(requestMetadata, response);
             assertEquals(counter.get(), result.getIntField());
             assertEquals("foo" + counter.getAndIncrement(), result.getStrField());
-          });
+          }));
     }
     steps.verifyComplete();
   }
@@ -365,7 +376,7 @@ public class ThriftServerRSocketTest {
 
     StepVerifier.create(rocket.requestStream(request))
         .assertNext(
-            response -> {
+            releasing(response -> {
               ResponseRpcMetadata responseMetadata = getResponseMetadata(response);
               assertEquals(
                   ErrorBlame.SERVER,
@@ -376,7 +387,7 @@ public class ThriftServerRSocketTest {
                       .getAppUnknownException()
                       .getErrorClassification()
                       .getBlame());
-            })
+            }))
         .verifyComplete();
   }
 
@@ -390,10 +401,10 @@ public class ThriftServerRSocketTest {
 
     StepVerifier.create(rocket.requestStream(request))
         .assertNext(
-            response -> {
+            releasing(response -> {
               assertRpcMetadataIsDefault(response);
               assertDataIsEmpty(response);
-            })
+            }))
         .verifyComplete();
   }
 
@@ -409,23 +420,23 @@ public class ThriftServerRSocketTest {
     StepVerifier.Step<Payload> steps =
         StepVerifier.create(rocket.requestStream(request))
             .assertNext(
-                response -> {
+                releasing(response -> {
                   assertRpcMetadataIsDefault(response);
                   InitialTestResponse initialResponse =
                       getInitialTestResponse(requestMetadata.getProtocol(), response);
                   assertEquals(100, initialResponse.getIntField());
-                });
+                }));
 
     final AtomicInteger counter = new AtomicInteger();
     for (int i = 0; i < 10; i++) {
       steps.assertNext(
-          response -> {
+          releasing(response -> {
             assertStreamMetadataIsDefault(response);
 
             TestResponse result = getTestResponse(requestMetadata, response);
             assertEquals(counter.get(), result.getIntField());
             assertEquals("foo" + counter.getAndIncrement(), result.getStrField());
-          });
+          }));
     }
     steps.verifyComplete();
   }
@@ -437,7 +448,7 @@ public class ThriftServerRSocketTest {
 
     StepVerifier.create(rocket.requestStream(request))
         .assertNext(
-            response -> {
+            releasing(response -> {
               ResponseRpcMetadata responseMetadata = getResponseMetadata(response);
               PayloadExceptionMetadataBase expMetadata =
                   responseMetadata.getPayloadMetadata().getExceptionMetadata();
@@ -450,7 +461,7 @@ public class ThriftServerRSocketTest {
                       .getBlame());
               assertEquals(excName, expMetadata.getNameUtf8());
               assertEquals(msg, expMetadata.getWhatUtf8());
-            })
+            }))
         .verifyComplete();
   }
 
@@ -465,15 +476,15 @@ public class ThriftServerRSocketTest {
 
     StepVerifier.create(rocket.requestStream(request))
         .assertNext(
-            response -> {
+            releasing(response -> {
               assertRpcMetadataIsDefault(response);
               assertEmptyResponse(response);
-            })
+            }))
         .assertNext(
-            response -> {
+            releasing(response -> {
               assertStreamMedatadataHasDeclaredException(response, expectedName, expectedWhat);
               payloadAssertion.accept(requestMetadata.getProtocol(), response);
-            })
+            }))
         .verifyComplete();
   }
 
@@ -542,12 +553,12 @@ public class ThriftServerRSocketTest {
 
     StepVerifier.create(rocket.requestStream(request))
         .assertNext(
-            response -> {
+            releasing(response -> {
               assertRpcMetadataIsDefault(response);
               assertEmptyResponse(response);
-            })
+            }))
         .assertNext(
-            response -> {
+            releasing(response -> {
               StreamPayloadMetadata streamMetadata = getStreamMetadata(response);
               PayloadExceptionMetadataBase expMetadata =
                   streamMetadata.getPayloadMetadata().getExceptionMetadata();
@@ -560,7 +571,7 @@ public class ThriftServerRSocketTest {
                       .getBlame());
               assertEquals(excName, expMetadata.getNameUtf8());
               assertEquals(msg, expMetadata.getWhatUtf8());
-            })
+            }))
         .verifyComplete();
   }
 
@@ -637,13 +648,17 @@ public class ThriftServerRSocketTest {
     Payload request = createPayload(requestMetadata, 0, "foo");
 
     StepVerifier.create(rocket.requestStream(request))
-        .expectNextCount(5)
+        .consumeNextWith(Payload::release)
+        .consumeNextWith(Payload::release)
+        .consumeNextWith(Payload::release)
+        .consumeNextWith(Payload::release)
+        .consumeNextWith(Payload::release)
         .assertNext(
-            response -> {
+            releasing(response -> {
               assertStreamMedatadataHasDeclaredException(
                   response, TestException.class.getName(), TestException.class.getName());
               assertDataIsTestException(requestMetadata.getProtocol(), response, 7);
-            })
+            }))
         .verifyComplete();
   }
 
@@ -663,20 +678,20 @@ public class ThriftServerRSocketTest {
 
     StepVerifier.create(rocket.requestStream(request))
         .assertNext(
-            response -> {
+            releasing(response -> {
               // initial response
               assertRpcMetadataIsDefault(response);
               assertDataIsEmpty(response);
-            })
+            }))
         .assertNext(
-            response -> {
+            releasing(response -> {
               // stream responses
               assertStreamMetadataIsDefault(response);
 
               TestResponse result = getTestResponse(requestMetadata, response);
               assertEquals(10, result.getIntField());
               assertEquals("foobar7", result.getStrField());
-            })
+            }))
         .verifyComplete();
   }
 
@@ -695,18 +710,18 @@ public class ThriftServerRSocketTest {
 
     StepVerifier.create(rocket.requestStream(request))
         .assertNext(
-            response -> {
+            releasing(response -> {
               assertRpcMetadataIsDefault(response);
               InitialTestResponse initialResponse =
                   getInitialTestResponse(requestMetadata.getProtocol(), response);
               assertEquals(100, initialResponse.getIntField());
-            })
+            }))
         .assertNext(
-            response -> {
+            releasing(response -> {
               assertStreamMedatadataHasDeclaredException(
                   response, TestException.class.getName(), TestException.class.getName());
               assertDataIsTestException(requestMetadata.getProtocol(), response, 14);
-            })
+            }))
         .verifyComplete();
   }
 
@@ -726,13 +741,13 @@ public class ThriftServerRSocketTest {
 
     StepVerifier.create(rocket.requestStream(request))
         .assertNext(
-            response -> {
+            releasing(response -> {
               assertRpcMedatadataHasDeclaredException(
                   response,
                   TestFunctionException.class.getName(),
                   TestFunctionException.class.getName());
               assertDataIsFunctionException(requestMetadata.getProtocol(), response, 13);
-            })
+            }))
         .verifyComplete();
   }
 
@@ -750,13 +765,13 @@ public class ThriftServerRSocketTest {
 
     StepVerifier.create(rocket.requestStream(request))
         .assertNext(
-            response -> {
+            releasing(response -> {
               assertRpcMedatadataHasDeclaredException(
                   response,
                   TestFunctionException.class.getName(),
                   TestFunctionException.class.getName());
               assertDataIsFunctionException(requestMetadata.getProtocol(), response, 17);
-            })
+            }))
         .verifyComplete();
   }
 

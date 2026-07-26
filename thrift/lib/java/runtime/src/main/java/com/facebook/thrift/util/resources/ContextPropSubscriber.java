@@ -21,54 +21,98 @@ import com.facebook.nifty.core.RequestContext;
 import com.facebook.nifty.core.RequestContexts;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 import org.reactivestreams.Subscription;
 import reactor.core.CoreSubscriber;
+import reactor.util.context.Context;
 
 public class ContextPropSubscriber<T> implements CoreSubscriber<T> {
-  final CoreSubscriber<T> delegate;
-  final Map<String, Object> contextData = new HashMap<>();
+  private final CoreSubscriber<T> delegate;
+  private final Set<String> contextDataKeys;
+  private final Map<String, Object> contextData = new HashMap<>();
 
   public ContextPropSubscriber(CoreSubscriber<T> delegate) {
     this.delegate = delegate;
+    this.contextDataKeys = Set.copyOf(ContextPropagationRegistry.getContextPropagationKeys());
   }
 
   @Override
   public void onSubscribe(Subscription s) {
-
-    delegate.onSubscribe(s);
-    // Copy the context data from the current context. onSubscribe will happen on current thread.
-    RequestContext context = RequestContexts.getOrCreateCurrentContext();
-    for (String key : ContextPropagationRegistry.getContextPropagationKeys()) {
-      if (context.getContextData(key) != null) {
-        this.contextData.put(key, context.getContextData(key));
+    // Capture before invoking the delegate: onSubscribe is allowed to request synchronously, which
+    // may produce signals before delegate.onSubscribe returns.
+    RequestContext context = RequestContexts.getCurrentContext();
+    if (context != null) {
+      for (String key : contextDataKeys) {
+        Object value = context.getContextData(key);
+        if (value != null) {
+          contextData.put(key, value);
+        }
       }
     }
+    delegate.onSubscribe(s);
   }
 
-  // Set context data for the captured contextData keys before doing onNext, onError, onComplete
   @Override
   public void onNext(T t) {
-    setContextData();
-    delegate.onNext(t);
+    withContextData(() -> delegate.onNext(t));
   }
 
   @Override
   public void onError(Throwable t) {
-    setContextData();
-    delegate.onError(t);
+    withContextData(() -> delegate.onError(t));
   }
 
   @Override
   public void onComplete() {
-    setContextData();
-    delegate.onComplete();
+    withContextData(delegate::onComplete);
   }
 
-  private void setContextData() {
-    // Set the new context data for the captured contextData keys
-    if (!this.contextData.isEmpty()) {
-      RequestContext context = RequestContexts.getOrCreateCurrentContext();
-      this.contextData.forEach((key, value) -> context.setContextData(key, value));
+  @Override
+  public Context currentContext() {
+    // Reactor context flows from the downstream subscriber towards upstream operators. Returning
+    // Context.empty() here makes every upstream contextWrite invisible once the global hook is
+    // enabled.
+    return delegate.currentContext();
+  }
+
+  private void withContextData(Runnable signal) {
+    if (contextDataKeys.isEmpty()) {
+      signal.run();
+      return;
+    }
+
+    RequestContext previousThreadContext = RequestContexts.getCurrentContext();
+    RequestContext activeContext = RequestContexts.getOrCreateCurrentContext();
+    Map<String, Object> previousValues = new HashMap<>();
+    for (String key : contextDataKeys) {
+      Object previousValue = activeContext.getContextData(key);
+      if (previousValue != null) {
+        previousValues.put(key, previousValue);
+      }
+      Object propagatedValue = contextData.get(key);
+      if (propagatedValue == null) {
+        activeContext.clearContextData(key);
+      } else {
+        activeContext.setContextData(key, propagatedValue);
+      }
+    }
+
+    try {
+      signal.run();
+    } finally {
+      for (String key : contextDataKeys) {
+        Object previousValue = previousValues.get(key);
+        if (previousValue == null) {
+          activeContext.clearContextData(key);
+        } else {
+          activeContext.setContextData(key, previousValue);
+        }
+      }
+      if (previousThreadContext == null) {
+        RequestContexts.clearCurrentContext();
+      } else {
+        RequestContexts.setCurrentContext(previousThreadContext);
+      }
     }
   }
 }

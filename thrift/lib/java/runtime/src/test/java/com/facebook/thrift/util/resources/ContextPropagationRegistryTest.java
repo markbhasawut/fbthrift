@@ -16,22 +16,70 @@
 
 package com.facebook.thrift.util.resources;
 
-import java.util.HashSet;
-import java.util.Set;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+import com.facebook.nifty.core.RequestContext;
+import com.facebook.nifty.core.RequestContexts;
+import com.facebook.thrift.util.NettyNiftyRequestContext;
+import java.util.HashMap;
 import org.junit.jupiter.api.Assertions;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
+import reactor.core.publisher.Mono;
+import reactor.util.context.Context;
 
 public class ContextPropagationRegistryTest {
+  private static final String PROPAGATION_KEY = "context-propagation-registry-test";
+
+  @AfterEach
+  public void clearThreadLocalContext() {
+    RequestContexts.clearCurrentContext();
+  }
+
   @Test
   public void testRegistry() {
-    Set<String> keys = new HashSet<>();
-    Assertions.assertEquals(false, ContextPropagationRegistry.isContextPropEnabled());
-    Assertions.assertEquals(keys, ContextPropagationRegistry.getContextPropagationKeys());
+    ContextPropagationRegistry.registerContextPropagationKey(PROPAGATION_KEY);
 
-    keys.add("foo");
-    ContextPropagationRegistry.registerContextPropagationKey("foo");
+    assertTrue(ContextPropagationRegistry.isContextPropEnabled());
+    assertTrue(ContextPropagationRegistry.getContextPropagationKeys().contains(PROPAGATION_KEY));
+    Assertions.assertThrows(
+        UnsupportedOperationException.class,
+        () -> ContextPropagationRegistry.getContextPropagationKeys().add("mutable"));
+  }
 
-    Assertions.assertEquals(true, ContextPropagationRegistry.isContextPropEnabled());
-    Assertions.assertEquals(keys, ContextPropagationRegistry.getContextPropagationKeys());
+  @Test
+  public void hookPreservesReactorContext() {
+    ContextPropagationRegistry.registerContextPropagationKey(PROPAGATION_KEY);
+
+    String value =
+        Mono.deferContextual(contextView -> Mono.just(contextView.<String>get("reactor-key")))
+            .contextWrite(Context.of("reactor-key", "reactor-value"))
+            .block();
+
+    assertEquals("reactor-value", value);
+  }
+
+  @Test
+  public void runnableRestoresPreviousThreadLocalValue() {
+    ContextPropagationRegistry.registerContextPropagationKey(PROPAGATION_KEY);
+
+    RequestContext source = new NettyNiftyRequestContext(new HashMap<>(), null);
+    source.setContextData(PROPAGATION_KEY, "source");
+    RequestContexts.setCurrentContext(source);
+    ContextPropRunnable runnable =
+        new ContextPropRunnable(
+            () ->
+                assertEquals(
+                    "source",
+                    RequestContexts.getCurrentContext().getContextData(PROPAGATION_KEY)));
+
+    RequestContext target = new NettyNiftyRequestContext(new HashMap<>(), null);
+    target.setContextData(PROPAGATION_KEY, "target");
+    RequestContexts.setCurrentContext(target);
+    runnable.run();
+
+    assertEquals(target, RequestContexts.getCurrentContext());
+    assertEquals("target", target.getContextData(PROPAGATION_KEY));
   }
 }

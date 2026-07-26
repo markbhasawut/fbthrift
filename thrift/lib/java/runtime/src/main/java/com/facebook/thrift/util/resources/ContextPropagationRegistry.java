@@ -18,8 +18,9 @@ package com.facebook.thrift.util.resources;
 
 import static com.google.common.base.Preconditions.checkNotNull;
 
-import java.util.HashSet;
+import java.util.Collections;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 import reactor.core.publisher.Hooks;
 import reactor.core.publisher.Operators;
 import reactor.core.scheduler.Schedulers;
@@ -28,9 +29,9 @@ public class ContextPropagationRegistry {
 
   private ContextPropagationRegistry() {}
 
-  private static final Set<String> propagationKeys = new HashSet<>();
+  private static final Set<String> propagationKeys = ConcurrentHashMap.newKeySet();
 
-  private static boolean hooksRegistered = false;
+  private static volatile boolean hooksRegistered = false;
 
   /**
    * Register a context propagation key. Keys passed here will be propagated in thread hops within
@@ -42,14 +43,21 @@ public class ContextPropagationRegistry {
    */
   public static void registerContextPropagationKey(String key) {
     checkNotNull(key, "Context prop key is null");
-    // Register `ContextPropRunnable` and `ContextPropSubscriber` on first invocation.
-    if (!hooksRegistered) {
-      Schedulers.onScheduleHook("context.propagation", ContextPropRunnable::new);
-      Hooks.onLastOperator(
-          Operators.lift((scannable, subscriber) -> new ContextPropSubscriber<>(subscriber)));
-      hooksRegistered = true;
-    }
     propagationKeys.add(key);
+
+    // Register ContextPropRunnable and ContextPropSubscriber on first invocation. Registration can
+    // happen from multiple service initializers, so serialize the one-time global hook mutation.
+    if (!hooksRegistered) {
+      synchronized (ContextPropagationRegistry.class) {
+        if (!hooksRegistered) {
+          Schedulers.onScheduleHook("context.propagation", ContextPropRunnable::new);
+          Hooks.onLastOperator(
+              "context.propagation",
+              Operators.lift((scannable, subscriber) -> new ContextPropSubscriber<>(subscriber)));
+          hooksRegistered = true;
+        }
+      }
+    }
   }
 
   /**
@@ -58,7 +66,7 @@ public class ContextPropagationRegistry {
    * @return ContextProp Keys
    */
   public static Set<String> getContextPropagationKeys() {
-    return propagationKeys;
+    return Collections.unmodifiableSet(propagationKeys);
   }
 
   /**

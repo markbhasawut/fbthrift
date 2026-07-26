@@ -26,19 +26,20 @@ import java.util.Set;
 public final class ContextPropRunnable implements Runnable {
   private final Runnable runnable;
   private final Map<String, Object> contextData = new HashMap<>();
-  private Set<String> contextDataKeys = ContextPropagationRegistry.getContextPropagationKeys();
+  private final Set<String> contextDataKeys;
 
   public ContextPropRunnable(Runnable runnable) {
     this.runnable = runnable;
+    this.contextDataKeys = Set.copyOf(ContextPropagationRegistry.getContextPropagationKeys());
 
-    // If there are no context data keys to propagate, we can just run the runnable directly
     if (!contextDataKeys.isEmpty()) {
-      RequestContext requestContext = RequestContexts.getOrCreateCurrentContext();
-
-      // Copy the context data for the keys we care about
-      for (String key : contextDataKeys) {
-        if (requestContext.getContextData(key) != null) {
-          this.contextData.put(key, requestContext.getContextData(key));
+      RequestContext requestContext = RequestContexts.getCurrentContext();
+      if (requestContext != null) {
+        for (String key : contextDataKeys) {
+          Object value = requestContext.getContextData(key);
+          if (value != null) {
+            contextData.put(key, value);
+          }
         }
       }
     }
@@ -46,28 +47,42 @@ public final class ContextPropRunnable implements Runnable {
 
   @Override
   public void run() {
-    Map<String, Object> oldContextData = new HashMap<>();
-    try {
-      // If there are no context data keys to propagate, we can just run the runnable directly
-      if (!contextDataKeys.isEmpty()) {
-        RequestContext requestContext = RequestContexts.getOrCreateCurrentContext();
+    if (contextDataKeys.isEmpty()) {
+      runnable.run();
+      return;
+    }
 
-        // Copy the "old" context data for the keys we care about
-        for (String key : this.contextDataKeys) {
-          if (requestContext.getContextData(key) != null) {
-            oldContextData.put(key, requestContext.getContextData(key));
-          }
-        }
-
-        // Set the new context data for the captured contextData keys
-        this.contextData.forEach((key, value) -> requestContext.setContextData(key, value));
+    RequestContext previousThreadContext = RequestContexts.getCurrentContext();
+    RequestContext activeContext = RequestContexts.getOrCreateCurrentContext();
+    Map<String, Object> previousValues = new HashMap<>();
+    for (String key : contextDataKeys) {
+      Object previousValue = activeContext.getContextData(key);
+      if (previousValue != null) {
+        previousValues.put(key, previousValue);
       }
+      Object propagatedValue = contextData.get(key);
+      if (propagatedValue == null) {
+        activeContext.clearContextData(key);
+      } else {
+        activeContext.setContextData(key, propagatedValue);
+      }
+    }
+
+    try {
       runnable.run();
     } finally {
-      if (!contextDataKeys.isEmpty()) {
-        // Restore the old context data for the keys
-        final RequestContext requestContext = RequestContexts.getCurrentContext();
-        oldContextData.forEach((key, value) -> requestContext.setContextData(key, value));
+      for (String key : contextDataKeys) {
+        Object previousValue = previousValues.get(key);
+        if (previousValue == null) {
+          activeContext.clearContextData(key);
+        } else {
+          activeContext.setContextData(key, previousValue);
+        }
+      }
+      if (previousThreadContext == null) {
+        RequestContexts.clearCurrentContext();
+      } else {
+        RequestContexts.setCurrentContext(previousThreadContext);
       }
     }
   }

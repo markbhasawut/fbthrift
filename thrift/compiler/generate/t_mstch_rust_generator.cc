@@ -865,6 +865,71 @@ struct rust_split_info {
   std::vector<const t_enum*> enums;
 };
 
+constexpr generator_option_spec kRustGeneratorOptions[] = {
+    {"serde", "serde", generator_option_value_policy::flag,
+     "Derive serde Serialize and Deserialize for generated types.", ""},
+    {"skip_none_serialization", "skip_none_serialization",
+     generator_option_value_policy::flag,
+     "With serde enabled, omit optional fields whose value is None.", ""},
+    {"valuable", "valuable", generator_option_value_policy::flag,
+     "Derive valuable::Valuable for generated types.", ""},
+    {"any", "any", generator_option_value_policy::flag,
+     "Generate Any registry initialization functions.", ""},
+    {"deprecated_default_enum_min_i32", "deprecated_default_enum_min_i32",
+     generator_option_value_policy::flag,
+     "Use i32::MIN as the default enum value. Deprecated.", ""},
+    {"deprecated_optional_with_default_is_some",
+     "deprecated_optional_with_default_is_some",
+     generator_option_value_policy::flag,
+     "Initialize optional fields with defaults to Some. Deprecated.", ""},
+    {"include_prefix", "include_prefix=<path>",
+     generator_option_value_policy::required,
+     "Set the program include prefix recorded by generated code.", ""},
+    {"types_include_srcs", "types_include_srcs=<src[:src...>]",
+     generator_option_value_policy::required,
+     "Include additional Rust source files in the types crate.", ""},
+    {"clients_include_srcs", "clients_include_srcs=<src[:src...>]",
+     generator_option_value_policy::required,
+     "Include additional Rust source files in the clients crate.", ""},
+    {"services_include_srcs", "services_include_srcs=<src[:src...>]",
+     generator_option_value_policy::required,
+     "Include additional Rust source files in the services crate.", ""},
+    {"include_docs", "include_docs=<markdown-file>",
+     generator_option_value_policy::required,
+     "Include Markdown before the crate-level documentation.", ""},
+    {"cratemap", "cratemap=<map-file>",
+     generator_option_value_policy::required,
+     "Use a service-to-crate mapping and enable multifile generation.", ""},
+    {"types_crate", "types_crate=<crate>",
+     generator_option_value_policy::required,
+     "Set the name used by the main crate for its types dependency.", ""},
+    {"clients_crate", "clients_crate=<crate>",
+     generator_option_value_policy::required,
+     "Set the name used by generated code for its clients dependency.", ""},
+    {"crate_name", "crate_name=<crate>",
+     generator_option_value_policy::required,
+     "Set the generated crate name; it must agree with namespace rust.", ""},
+    {"default_crate_name", "default_crate_name=<crate>",
+     generator_option_value_policy::required,
+     "Set the crate name only when the IDL has no namespace rust.", ""},
+    {"types_split_count", "types_split_count=<count>",
+     generator_option_value_policy::required,
+     "Split independent types into this many additional Rust modules.", ""},
+    {"gen_metadata", "gen_metadata=true|false",
+     generator_option_value_policy::required,
+     "Enable or disable generated metadata; the default is generator-defined.",
+     ""},
+};
+
+std::string rust_generator_documentation() {
+  return make_generator_documentation(
+      "Generate Rust types, clients, services, errors, constants, and mocks "
+      "in gen-rust. The public name is rust; mstch_rust is the legacy "
+      "implementation name. namespace rust selects the crate name.",
+      "thrift1 --gen 'rust[:OPTION[,...]]' FILE",
+      kRustGeneratorOptions);
+}
+
 class t_mstch_rust_generator : public t_whisker_generator {
  public:
   using t_whisker_generator::t_whisker_generator;
@@ -1868,6 +1933,12 @@ class t_mstch_rust_generator : public t_whisker_generator {
 void t_mstch_rust_generator::process_options(
     const std::map<std::string, std::string>& options) {
   t_whisker_generator::process_options(options);
+  validate_generator_options("rust", options, kRustGeneratorOptions);
+  if (options.contains("skip_none_serialization") &&
+      !options.contains("serde")) {
+    throw std::runtime_error(
+        "rust generator option `skip_none_serialization` requires `serde`");
+  }
   if (auto types_crate_flag = get_compiler_option("types_crate")) {
     options_.types_crate = boost::algorithm::replace_all_copy(
         std::string(*types_crate_flag), "-", "_");
@@ -2151,18 +2222,5 @@ void t_mstch_rust_generator::fill_validator_visitors(
 THRIFT_REGISTER_GENERATOR(
     mstch_rust,
     "Rust",
-    R"(serde:           Derive serde Serialize/Deserialize traits for types
-valuable:        Derive valuable Valuable trait for types
-any:             Generate "any registry" initialization functions
-deprecated_default_enum_min_i32:
-                 Default enum value is i32::MIN. Deprecated, to be removed in future versions
-deprecated_optional_with_default_is_some:
-                 Optionals with defaults initialized to `Some`. Deprecated, to be removed in future versions
-include_prefix=: Set program:include_prefix.
-types_include_srcs=, clients_include_srcs=, services_include_srcs=:
-                 Additional Rust source files to include in each crate, `:` separated
-include_docs=:   Markdown to include in front of crate-level documentation.
-cratemap=map:    Mapping file from services to crate names
-types_crate=:    Name that the main crate uses to refer to its dependency on the types crate
-types_split_count=:    Number of compilation units to split the independent types into)");
+    rust_generator_documentation());
 } // namespace apache::thrift::compiler::rust

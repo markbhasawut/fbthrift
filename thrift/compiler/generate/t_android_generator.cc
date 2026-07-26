@@ -72,7 +72,13 @@ void t_android_generator::init_generator() {
   package_dir_ = subdir;
 }
 
-THRIFT_REGISTER_GENERATOR(android, "Android Java", "");
+THRIFT_REGISTER_GENERATOR(
+    android,
+    "Android Lite Java",
+    R"(Generate the constrained legacy Java API used by thrift/lib/android_lite in gen-android. The public name is android_lite; android is the legacy implementation name.
+
+Usage: thrift1 --gen android_lite FILE
+This generator has no generator options. Use namespace android for the package.)");
 
 } // namespace
 } // namespace apache::thrift::compiler

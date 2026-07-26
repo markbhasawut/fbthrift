@@ -179,8 +179,13 @@ generator_registry::get_generator_aliases() {
   static const generator_alias_map* aliases = new generator_alias_map{
       {"cpp", "mstch_cpp2"},
       {"cpp2", "mstch_cpp2"},
+      {"go", "mstch_go"},
+      {"java", "mstch_java"},
+      {"javadeprecated", "java_deprecated"},
+      {"android_lite", "android"},
       {"py3", "mstch_py3"},
       {"python", "mstch_python"},
+      {"rust", "mstch_rust"},
   };
   return *aliases;
 }

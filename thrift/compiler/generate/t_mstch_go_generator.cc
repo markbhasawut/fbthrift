@@ -26,6 +26,33 @@ namespace apache::thrift::compiler {
 
 namespace {
 
+constexpr generator_option_spec kGoGeneratorOptions[] = {
+    {
+        "gen_metadata",
+        "gen_metadata=true|false",
+        generator_option_value_policy::required,
+        "Emit metadata.go when true. The default is false.",
+        "",
+    },
+    {
+        "use_reflect_codec",
+        "use_reflect_codec=true|false",
+        generator_option_value_policy::required,
+        "Generate codec paths backed by the reflection codec when true. The "
+        "default is false.",
+        "",
+    },
+};
+
+std::string go_generator_documentation() {
+  return make_generator_documentation(
+      "Generate Go types, codecs, clients, and processors in gen-go. The "
+      "public name is go; mstch_go is the legacy implementation name. A "
+      "namespace go directive supplies the import path and package name.",
+      "thrift1 --gen 'go[:OPTION[,...]]' FILE",
+      kGoGeneratorOptions);
+}
+
 class t_mstch_go_generator : public t_whisker_generator {
  public:
   using t_whisker_generator::t_whisker_generator;
@@ -39,6 +66,12 @@ class t_mstch_go_generator : public t_whisker_generator {
   }
 
   void generate_program() override;
+
+  void process_options(
+      const std::map<std::string, std::string>& options) final {
+    t_whisker_generator::process_options(options);
+    validate_generator_options("go", options, kGoGeneratorOptions);
+  }
 
   strictness_options strictness() const override {
     strictness_options strict;
@@ -500,6 +533,6 @@ void t_mstch_go_generator::generate_program() {
 
 } // namespace
 
-THRIFT_REGISTER_GENERATOR(mstch_go, "Go", "");
+THRIFT_REGISTER_GENERATOR(mstch_go, "Go", go_generator_documentation());
 
 } // namespace apache::thrift::compiler

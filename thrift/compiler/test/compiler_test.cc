@@ -1479,7 +1479,7 @@ TEST(CompilerTest, cpp2_generator_option_validation) {
        "mstch_cpp2:reflection,disable_custom_type_ordering_if_structure_has_uri,deprecated_private_fields_for_cpp_ref,nimble,service_cpp_splits={MissingService:1},templates,visitation"});
 }
 
-TEST(CompilerTest, oss_generator_aliases_and_python_option_validation) {
+TEST(CompilerTest, oss_generator_aliases_and_option_validation) {
   // cpp is the public compatibility alias for the modern cpp2 backend.
   check_compile(
       R"(
@@ -1533,6 +1533,66 @@ TEST(CompilerTest, oss_generator_aliases_and_python_option_validation) {
     struct Foo { 1: i32 field }
 )",
       {"--gen", "python:missing"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    namespace go example.test
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "go:gen_metadata=true"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: Unknown go generator option `missing`; run `thrift1 --help` for the supported options
+    namespace go example.test
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "go:missing"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    namespace rust example
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "rust:serde,skip_none_serialization"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: rust generator option `skip_none_serialization` requires `serde`
+    namespace rust example
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "rust:skip_none_serialization"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    namespace java.swift com.example.test
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "java"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: Unknown java generator option `missing`; run `thrift1 --help` for the supported options
+    namespace java.swift com.example.test
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "java:missing"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    namespace java com.example.test
+    namespace android com.example.test
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "javadeprecated", "--gen", "android_lite"});
 }
 
 TEST(CompilerTest, invalid_and_too_many_client_splits) {

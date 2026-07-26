@@ -40,6 +40,34 @@ namespace apache::thrift::compiler {
 
 namespace {
 
+constexpr generator_option_spec kJavaGeneratorOptions[] = {
+    {
+        "separate_data_type_from_services",
+        "separate_data_type_from_services",
+        generator_option_value_policy::flag,
+        "Place generated data types below gen-java/data-type while services "
+        "remain in the normal Java package tree.",
+        "",
+    },
+    {
+        "deprecated_allow_leagcy_reflection_client",
+        "deprecated_allow_leagcy_reflection_client",
+        generator_option_value_policy::flag,
+        "Generate the deprecated reflection client compatibility surface. "
+        "The misspelled option name is retained for source compatibility.",
+        "",
+    },
+};
+
+std::string java_generator_documentation() {
+  return make_generator_documentation(
+      "Generate the modern Reactive Java runtime API in gen-java. The public "
+      "name is java; mstch_java is the legacy implementation name. Use "
+      "namespace java.swift for the generated package.",
+      "thrift1 --gen 'java[:OPTION[,...]]' FILE",
+      kJavaGeneratorOptions);
+}
+
 /**
  * Gets the java namespace, throws a runtime error if not found.
  */
@@ -324,6 +352,12 @@ class t_mstch_java_generator : public t_whisker_generator {
   using t_whisker_generator::t_whisker_generator;
 
   void generate_program() override;
+
+  void process_options(
+      const std::map<std::string, std::string>& options) final {
+    t_whisker_generator::process_options(options);
+    validate_generator_options("java", options, kJavaGeneratorOptions);
+  }
 
   void fill_validator_visitors(ast_validator& validator) const override {
     validator.add_enum_visitor(validate_java_enum_intrinsic_default);
@@ -1226,6 +1260,6 @@ void t_mstch_java_generator::generate_program() {
 
 } // namespace
 
-THRIFT_REGISTER_GENERATOR(mstch_java, "Java", "");
+THRIFT_REGISTER_GENERATOR(mstch_java, "Java", java_generator_documentation());
 
 } // namespace apache::thrift::compiler

@@ -4070,6 +4070,12 @@ bool t_java_deprecated_generator::has_bit_vector(const t_structured* tstruct) {
   return false;
 }
 
-THRIFT_REGISTER_GENERATOR(java_deprecated, "Java Deprecated", "");
+THRIFT_REGISTER_GENERATOR(
+    java_deprecated,
+    "Java Deprecated",
+    R"(Generate the legacy synchronous Java API in gen-javadeprecated. The public name is javadeprecated; java_deprecated is the legacy implementation name.
+
+Usage: thrift1 --gen javadeprecated FILE
+This generator has no generator options. Use namespace java for the package.)");
 
 } // namespace apache::thrift::compiler

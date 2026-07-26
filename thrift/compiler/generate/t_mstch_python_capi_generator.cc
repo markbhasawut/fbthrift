@@ -37,6 +37,60 @@ namespace apache::thrift::compiler {
 
 namespace {
 
+constexpr generator_option_spec kPythonCapiGeneratorOptions[] = {
+    {
+        "include_prefix",
+        "include_prefix=<path>",
+        generator_option_value_policy::required,
+        "Override the prefix used for companion cpp2 and generated C API "
+        "#include directives. It does not move gen-python-capi output.",
+        "",
+    },
+    {
+        "root_module_prefix",
+        "root_module_prefix=<module>",
+        generator_option_value_policy::required,
+        "Prepend a Python module path to imports. Use the same value for the "
+        "companion python generation.",
+        "",
+    },
+    {
+        "enable_isset_deprecated_unsafe",
+        "enable_isset_deprecated_unsafe[=1]",
+        generator_option_value_policy::optional,
+        "Match the legacy isset tuple layout emitted by the companion python "
+        "generator. The flag form and =1 are equivalent.",
+        "",
+    },
+    {
+        "marshal_python_capi",
+        "marshal_python_capi[=1]",
+        generator_option_value_policy::optional,
+        "Force direct C API marshalling for eligible structured types. The "
+        "flag form and =1 are equivalent.",
+        "",
+    },
+    {
+        "serialize_python_capi",
+        "serialize_python_capi[=1]",
+        generator_option_value_policy::optional,
+        "Force the serialization fallback instead of direct C API marshalling. "
+        "This takes precedence over marshal_python_capi and trades additional "
+        "CPU and copies for broader type compatibility.",
+        "",
+    },
+};
+
+std::string python_capi_generator_documentation() {
+  return make_generator_documentation(
+      "Generate the C++ and Cython bridge between thrift.python objects and "
+      "companion cpp2 native types in gen-python-capi. This is not a "
+      "standalone Python runtime backend; generate cpp2 and python from the "
+      "same IDL and compile the emitted C++ and Cython sources.",
+      "thrift1 --gen 'python_capi[:OPTION[,...]]' FILE",
+      kPythonCapiGeneratorOptions);
+}
+
 std::string_view remove_global_scope(std::string_view symbol) {
   if (symbol.size() >= 2 && symbol.find("::", 0, 2) == 0) {
     symbol.remove_prefix(2);
@@ -326,12 +380,14 @@ bool is_capi_eligible_type(const t_type* type, const t_field* field = nullptr) {
   if (const t_list* list = type->try_as<t_list>();
       list != nullptr && !is_capi_eligible_type(&list->elem_type().deref())) {
     return false;
-  } else if (const t_set* set = type->try_as<t_set>(); set != nullptr &&
-             !is_capi_eligible_type(&set->elem_type().deref())) {
+  } else if (
+      const t_set* set = type->try_as<t_set>();
+      set != nullptr && !is_capi_eligible_type(&set->elem_type().deref())) {
     return false;
-  } else if (const t_map* map = type->try_as<t_map>(); map != nullptr &&
-             (!is_capi_eligible_type(&map->key_type().deref()) ||
-              !is_capi_eligible_type(&map->val_type().deref()))) {
+  } else if (
+      const t_map* map = type->try_as<t_map>(); map != nullptr &&
+      (!is_capi_eligible_type(&map->key_type().deref()) ||
+       !is_capi_eligible_type(&map->val_type().deref()))) {
     return false;
   }
   if (const t_typedef* tdef = type->try_as<t_typedef>()) {
@@ -443,6 +499,21 @@ class t_mstch_python_capi_generator : public t_whisker_generator {
 
   void process_options(
       const std::map<std::string, std::string>& options) override {
+    validate_generator_options(
+        "python_capi", options, kPythonCapiGeneratorOptions);
+    for (std::string_view flag :
+         {"enable_isset_deprecated_unsafe",
+          "marshal_python_capi",
+          "serialize_python_capi"}) {
+      if (const auto it = options.find(std::string(flag));
+          it != options.end() && !it->second.empty() && it->second != "1") {
+        throw std::runtime_error(
+            fmt::format(
+                "python_capi generator option `{}` accepts only the flag form "
+                "or `=1`",
+                flag));
+      }
+    }
     t_whisker_generator::process_options(options);
     out_dir_base_ = "gen-python-capi";
     if (std::string_view include_prefix =
@@ -615,7 +686,7 @@ class t_mstch_python_capi_generator : public t_whisker_generator {
 
 THRIFT_REGISTER_GENERATOR(
     mstch_python_capi,
-    "Python Capi",
-    "include_prefix:  Use full include paths in generated files.");
+    "Python C API bridge",
+    python_capi_generator_documentation());
 
 } // namespace apache::thrift::compiler

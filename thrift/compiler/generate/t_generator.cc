@@ -184,7 +184,9 @@ generator_registry::get_generator_aliases() {
       {"javadeprecated", "java_deprecated"},
       {"android_lite", "android"},
       {"py3", "mstch_py3"},
+      {"pyi", "mstch_pyi"},
       {"python", "mstch_python"},
+      {"python_capi", "mstch_python_capi"},
       {"rust", "mstch_rust"},
   };
   return *aliases;

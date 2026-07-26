@@ -33,6 +33,106 @@ namespace apache::thrift::compiler {
 
 namespace {
 
+constexpr generator_option_spec kPyiGeneratorOptions[] = {
+    {
+        "asyncio",
+        "asyncio",
+        generator_option_value_policy::flag,
+        "Use namespace py.asyncio, when present, instead of namespace py. "
+        "This must match the companion py generation.",
+        "",
+    },
+    {
+        "enable_pos_args",
+        "enable_pos_args",
+        generator_option_value_policy::flag,
+        "Emit positional parameters in generated service method signatures. "
+        "Without this option, service arguments are keyword-only.",
+        "",
+    },
+    {
+        "compare_t_fields_only",
+        "compare_t_fields_only",
+        generator_option_value_policy::flag,
+        "Accepted as a compatibility no-op so the option list used for "
+        "companion py generation can be reused.",
+        "",
+    },
+    {
+        "cpp_transport",
+        "cpp_transport",
+        generator_option_value_policy::flag,
+        "Accepted as a compatibility no-op so the option list used for "
+        "companion py generation can be reused.",
+        "",
+    },
+    {
+        "future",
+        "future",
+        generator_option_value_policy::flag,
+        "Accepted as a compatibility no-op so the option list used for "
+        "companion py generation can be reused.",
+        "",
+    },
+    {
+        "json",
+        "json",
+        generator_option_value_policy::flag,
+        "Accepted as a compatibility no-op so the option list used for "
+        "companion py generation can be reused.",
+        "",
+    },
+    {
+        "new_style",
+        "new_style",
+        generator_option_value_policy::flag,
+        "Accepted as a compatibility no-op so the option list used for "
+        "companion py generation can be reused.",
+        "",
+    },
+    {
+        "slots",
+        "slots",
+        generator_option_value_policy::flag,
+        "Accepted as a compatibility no-op so the option list used for "
+        "companion py generation can be reused.",
+        "",
+    },
+    {
+        "sort_keys",
+        "sort_keys",
+        generator_option_value_policy::flag,
+        "Accepted as a compatibility no-op so the option list used for "
+        "companion py generation can be reused.",
+        "",
+    },
+    {
+        "thrift_port",
+        "thrift_port=<port>",
+        generator_option_value_policy::required,
+        "Accepted as a compatibility no-op so the option list used for "
+        "companion py generation can be reused.",
+        "",
+    },
+    {
+        "utf8strings",
+        "utf8strings",
+        generator_option_value_policy::flag,
+        "Accepted as a compatibility no-op so the option list used for "
+        "companion py generation can be reused.",
+        "",
+    },
+};
+
+std::string pyi_generator_documentation() {
+  return make_generator_documentation(
+      "Generate PEP 484 interface stubs for the legacy thrift.py modules in "
+      "gen-py. Invoke this companion generator alongside py; it does not "
+      "generate a runtime implementation.",
+      "thrift1 --gen 'pyi[:OPTION[,...]]' FILE",
+      kPyiGeneratorOptions);
+}
+
 std::string get_filtered_name(const t_named& node) {
   // Reserved Python keywords that are not blocked by thrift grammar - note that
   // this is actually a longer list than what t_py_generator checks, but may
@@ -158,6 +258,12 @@ class t_mstch_pyi_generator : public t_whisker_generator {
   using t_whisker_generator::t_whisker_generator;
 
   std::string template_prefix() const override { return "pyi"; }
+
+  void process_options(
+      const std::map<std::string, std::string>& options) override {
+    validate_generator_options("pyi", options, kPyiGeneratorOptions);
+    t_whisker_generator::process_options(options);
+  }
 
   void generate_program() override;
 
@@ -340,9 +446,10 @@ void t_mstch_pyi_generator::render_file(
             render_state().prototypes->create<t_program>(*program_))
       : whisker::make::native_handle(
             render_state().prototypes->create<t_service>(*service));
-  render_to_file(/*output_file=*/path,
-                 /*template_file=*/template_name,
-                 /*context=*/context);
+  render_to_file(
+      /*output_file=*/path,
+      /*template_file=*/template_name,
+      /*context=*/context);
 }
 
 std::filesystem::path t_mstch_pyi_generator::get_root_path() const {
@@ -361,6 +468,6 @@ std::filesystem::path t_mstch_pyi_generator::get_root_path() const {
 } // namespace
 
 THRIFT_REGISTER_GENERATOR(
-    mstch_pyi, "Legacy Python type information", "no arguments");
+    mstch_pyi, "Legacy Python type information", pyi_generator_documentation());
 
 } // namespace apache::thrift::compiler

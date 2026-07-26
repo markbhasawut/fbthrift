@@ -1593,6 +1593,56 @@ TEST(CompilerTest, oss_generator_aliases_and_option_validation) {
     struct Foo { 1: i32 field }
 )",
       {"--gen", "javadeprecated", "--gen", "android_lite"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    namespace py example.test
+    namespace py.asyncio example.test.asyncio
+    struct Foo { 1: i32 field }
+    service MyService { Foo ping(1: Foo request); }
+)",
+      {"--gen", "pyi:asyncio,enable_pos_args,json"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: Unknown pyi generator option `missing`; run `thrift1 --help` for the supported options
+    namespace py example.test
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "pyi:missing"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    namespace cpp2 example.test
+    namespace py3 example.test
+    struct Foo { 1: i32 field }
+)",
+      {"--gen",
+       "python_capi:include_prefix=project,root_module_prefix=project,"
+       "marshal_python_capi=1,enable_isset_deprecated_unsafe=1"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: python_capi generator option `serialize_python_capi` accepts only the flag form or `=1`
+    namespace cpp2 example.test
+    namespace py3 example.test
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "python_capi:serialize_python_capi=0"});
+
+  check_compile(
+      R"(
+    package "facebook.com/thrift/test"
+    # expected-error@-1: Unknown python_capi generator option `missing`; run `thrift1 --help` for the supported options
+    namespace cpp2 example.test
+    namespace py3 example.test
+    struct Foo { 1: i32 field }
+)",
+      {"--gen", "python_capi:missing"});
 }
 
 TEST(CompilerTest, invalid_and_too_many_client_splits) {

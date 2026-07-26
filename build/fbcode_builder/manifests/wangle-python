@@ -11,16 +11,13 @@ repo_url = https://github.com/facebook/wangle.git
 builder = cmake
 subdir = wangle
 
-[build.not(os=linux)]
-builder = nop
-
 [cmake.defines.test=on]
 BUILD_TESTS=ON
 
 [cmake.defines.test=off]
 BUILD_TESTS=OFF
 
-[cmake.defines.os=linux]
+[cmake.defines]
 CMAKE_POSITION_INDEPENDENT_CODE = ON
 BUILD_SHARED_LIBS = ON
 

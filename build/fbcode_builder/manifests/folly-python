@@ -5,14 +5,13 @@ shipit_project = folly
 shipit_fbcode_builder = true
 
 [git]
-repo_url = https://github.com/facebook/folly.git
+repo_url = https://github.com/markbhasawut/folly.git
+branch = oss-fixes
+rev = c9c17f2ca5e6617213d74bd072d59a4fb215d993
 
 [build]
 builder = cmake
 job_weight_mib = 1024
-
-[build.not(os=linux)]
-builder = nop
 
 [dependencies]
 gflags
@@ -64,7 +63,7 @@ fbcode/folly = folly
 ^fbcode/folly/folly-config\.h$
 ^fbcode/folly/public_tld/build/facebook_.*
 
-[cmake.defines.os=linux]
+[cmake.defines]
 PYTHON_EXTENSIONS=ON
 BUILD_SHARED_LIBS=ON
 

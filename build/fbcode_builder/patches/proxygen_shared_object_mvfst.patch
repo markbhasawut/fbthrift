@@ -1,0 +1,226 @@
+diff --git a/cmake/ProxygenFunctions.cmake b/cmake/ProxygenFunctions.cmake
+--- a/cmake/ProxygenFunctions.cmake
++++ b/cmake/ProxygenFunctions.cmake
+@@ -12,7 +12,8 @@ set_property(GLOBAL PROPERTY PROXYGEN_GRANULAR_INTERFACE_TARGETS)
+ # Define a granular proxygen library that:
+ # 1. Compiles sources ONCE via OBJECT library
+ # 2. Creates a STATIC library for individual linking (static builds)
+-# 3. Creates an INTERFACE library linking to monolithic proxygen (shared builds)
++# 3. Creates an INTERFACE library for monolithic components and a SHARED library
++#    for components declared after the monolithic proxygen target (shared builds)
+ # 4. Defers internal proxygen deps to be resolved later
+ # 5. Tracks OBJECT target for monolithic aggregation
+ # 6. Creates proxygen:: namespace alias
+@@ -124,8 +125,14 @@ function(proxygen_add_library _target_name)
+ 
+   # For shared builds: link Folly::folly, fizz::fizz, wangle::wangle to OBJECT libraries
+   # to get transitive includes
+   if(BUILD_SHARED_LIBS)
+-    target_link_libraries(${_obj_target} PUBLIC Folly::folly fizz::fizz wangle::wangle)
++    target_link_libraries(
++      ${_obj_target}
++      PUBLIC
++        Folly::folly
++        fizz::fizz
++        mvfst::mvfst
++        wangle::wangle)
+   endif()
+ 
+   # Defer internal proxygen dependencies until all targets are created
+@@ -163,12 +170,15 @@ function(proxygen_add_library _target_name)
+   endif()
+ 
+   # Track OBJECT target for monolithic aggregation (unless excluded)
+-  if(NOT PROXYGEN_LIB_EXCLUDE_FROM_MONOLITH)
++  # Components declared after proxygen exists cannot be added retroactively.
++  if(NOT PROXYGEN_LIB_EXCLUDE_FROM_MONOLITH AND NOT TARGET proxygen)
+     set_property(GLOBAL APPEND PROPERTY PROXYGEN_COMPONENT_TARGETS ${_obj_target})
+   endif()
+ 
+   # 2. Create the granular library target
+-  if(BUILD_SHARED_LIBS AND NOT PROXYGEN_LIB_EXCLUDE_FROM_MONOLITH)
++  if(BUILD_SHARED_LIBS AND
++     NOT PROXYGEN_LIB_EXCLUDE_FROM_MONOLITH AND
++     NOT TARGET proxygen)
+     # For shared builds: create INTERFACE library that will link to monolithic proxygen
+     add_library(${_target_name} INTERFACE)
+ 
+@@ -183,9 +193,9 @@ function(proxygen_add_library _target_name)
+     set_property(GLOBAL APPEND PROPERTY PROXYGEN_GRANULAR_INTERFACE_TARGETS ${_target_name})
+ 
+     install(TARGETS ${_target_name} EXPORT proxygen-exports)
+-  elseif(BUILD_SHARED_LIBS AND PROXYGEN_LIB_EXCLUDE_FROM_MONOLITH)
+-    # For excluded targets in shared builds: create SHARED library with actual code
+-    # These are NOT in the monolithic proxygen, so they need their own implementation
++  elseif(BUILD_SHARED_LIBS)
++    # Explicitly excluded and late-declared targets are not in the monolithic
++    # proxygen library, so they need their own implementation.
+     add_library(${_target_name} SHARED $<TARGET_OBJECTS:${_obj_target}>)
+ 
+     if(DEFINED PACKAGE_VERSION)
+diff --git a/proxygen/httpclient/CMakeLists.txt b/proxygen/httpclient/CMakeLists.txt
+--- a/proxygen/httpclient/CMakeLists.txt
++++ b/proxygen/httpclient/CMakeLists.txt
+@@ -6,4 +6,6 @@
+ 
+ if (BUILD_SAMPLES)
+   add_subdirectory(samples)
++elseif(BUILD_TESTS)
++  add_subdirectory(samples/curl)
+ endif()
+diff --git a/proxygen/httpclient/samples/curl/CMakeLists.txt b/proxygen/httpclient/samples/curl/CMakeLists.txt
+--- a/proxygen/httpclient/samples/curl/CMakeLists.txt
++++ b/proxygen/httpclient/samples/curl/CMakeLists.txt
+@@ -14,18 +14,20 @@ proxygen_add_library(proxygencurl
+     proxygen
+ )
+ 
+-add_executable(proxygen_curl CurlClientMain.cpp)
+-target_compile_options(
+-    proxygen_curl PRIVATE
+-    ${_PROXYGEN_COMMON_COMPILE_OPTIONS}
+-)
+-target_link_libraries(
+-    proxygen_curl
+-    PUBLIC
+-        proxygencurl
+-)
+-install(
+-    TARGETS proxygen_curl
+-    EXPORT proxygen-exports
+-    DESTINATION bin
+-)
++if(BUILD_SAMPLES)
++  add_executable(proxygen_curl CurlClientMain.cpp)
++  target_compile_options(
++      proxygen_curl PRIVATE
++      ${_PROXYGEN_COMMON_COMPILE_OPTIONS}
++  )
++  target_link_libraries(
++      proxygen_curl
++      PUBLIC
++          proxygencurl
++  )
++  install(
++      TARGETS proxygen_curl
++      EXPORT proxygen-exports
++      DESTINATION bin
++  )
++endif()
+diff --git a/proxygen/lib/http/codec/compress/test/CMakeLists.txt b/proxygen/lib/http/codec/compress/test/CMakeLists.txt
+--- a/proxygen/lib/http/codec/compress/test/CMakeLists.txt
++++ b/proxygen/lib/http/codec/compress/test/CMakeLists.txt
+@@ -19,7 +19,10 @@ target_compile_options(
+     hpacktestutils PRIVATE
+     ${_PROXYGEN_COMMON_COMPILE_OPTIONS}
+ )
+-target_link_libraries(hpacktestutils PUBLIC proxygen)
++target_link_libraries(hpacktestutils PUBLIC
++    proxygen
++    ${LIBGMOCK_LIBRARIES}
++)
+ 
+ proxygen_add_test(TARGET HPACKTests
+   SOURCES
+diff --git a/proxygen/lib/http/codec/test/CMakeLists.txt b/proxygen/lib/http/codec/test/CMakeLists.txt
+--- a/proxygen/lib/http/codec/test/CMakeLists.txt
++++ b/proxygen/lib/http/codec/test/CMakeLists.txt
+@@ -19,7 +19,10 @@ target_compile_options(
+     codectestutils PRIVATE
+     ${_PROXYGEN_COMMON_COMPILE_OPTIONS}
+ )
+-target_link_libraries(codectestutils PUBLIC proxygen)
++target_link_libraries(codectestutils PUBLIC
++    proxygen
++    ${LIBGMOCK_LIBRARIES}
++)
+ 
+ proxygen_add_test(TARGET CodecTests
+   SOURCES
+diff --git a/proxygen/lib/http/session/test/CMakeLists.txt b/proxygen/lib/http/session/test/CMakeLists.txt
+--- a/proxygen/lib/http/session/test/CMakeLists.txt
++++ b/proxygen/lib/http/session/test/CMakeLists.txt
+@@ -34,8 +34,11 @@ target_compile_options(
+     sessiontestutils PRIVATE
+     ${_PROXYGEN_COMMON_COMPILE_OPTIONS}
+ )
+-target_link_libraries(sessiontestutils PUBLIC proxygen)
++target_link_libraries(sessiontestutils PUBLIC
++    proxygen
++    ${LIBGMOCK_LIBRARIES}
++)
+ 
+ 
+ proxygen_add_test(TARGET SessionTests
+   SOURCES
+diff --git a/proxygen/lib/test/CMakeLists.txt b/proxygen/lib/test/CMakeLists.txt
+--- a/proxygen/lib/test/CMakeLists.txt
++++ b/proxygen/lib/test/CMakeLists.txt
+@@ -28,7 +28,10 @@ target_include_directories(
+     ${LIBGMOCK_INCLUDE_DIR}
+     ${LIBGTEST_INCLUDE_DIR}
+ )
+-target_link_libraries(testmain PUBLIC Folly::folly)
++target_link_libraries(testmain PUBLIC
++    Folly::folly
++    ${LIBGMOCK_LIBRARIES}
++)
+ target_compile_options(
+     testmain PRIVATE
+     ${_PROXYGEN_COMMON_COMPILE_OPTIONS}
+diff --git a/build/fbcode_builder/CMake/FindCares.cmake b/build/fbcode_builder/CMake/FindCares.cmake
+--- a/build/fbcode_builder/CMake/FindCares.cmake
++++ b/build/fbcode_builder/CMake/FindCares.cmake
+@@ -15,16 +15,16 @@ mark_as_advanced(
+   CARES_INCLUDE_DIR
+ )
+ 
+-if(NOT TARGET cares)
++if(NOT TARGET c-ares::cares)
+     if("${CARES_LIBRARIES}" MATCHES ".*.a$")
+-    add_library(cares STATIC IMPORTED)
++    add_library(c-ares::cares STATIC IMPORTED)
+     else()
+-    add_library(cares SHARED IMPORTED)
++    add_library(c-ares::cares SHARED IMPORTED)
+     endif()
+     set_target_properties(
+-        cares
++        c-ares::cares
+         PROPERTIES
+             IMPORTED_LOCATION ${CARES_LIBRARIES}
+             INTERFACE_INCLUDE_DIRECTORIES ${CARES_INCLUDE_DIR}
+     )
+ endif()
+diff --git a/cmake/ProxygenFunctions.cmake b/cmake/ProxygenFunctions.cmake
+--- a/cmake/ProxygenFunctions.cmake
++++ b/cmake/ProxygenFunctions.cmake
+@@ -381,6 +381,6 @@ function(proxygen_create_monolithic_library)
+       ${OPENSSL_LIBRARIES}
+       Threads::Threads
+-      cares
++      c-ares::cares
+     PRIVATE
+       glog::glog
+       ${GFLAG_DEPENDENCIES}
+diff --git a/proxygen/lib/dns/CMakeLists.txt b/proxygen/lib/dns/CMakeLists.txt
+--- a/proxygen/lib/dns/CMakeLists.txt
++++ b/proxygen/lib/dns/CMakeLists.txt
+@@ -61,7 +61,7 @@ proxygen_add_library(proxygen_dns_cares_dns
+     proxygen_utils_time_util
+     Folly::folly_conv
+     Folly::folly_portability_sockets
+-    cares
++    c-ares::cares
+     glog::glog
+   EXPORTED_DEPS
+     proxygen_dns_dns_base
+@@ -69,7 +69,7 @@ proxygen_add_library(proxygen_dns_cares_dns
+     Folly::folly_io_async_async_base
+     Folly::folly_network_address
+     Folly::folly_portability_windows
+-    cares
++    c-ares::cares
+ )
+ 
+ proxygen_add_library(proxygen_dns_future_dns

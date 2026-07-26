@@ -168,17 +168,25 @@ function(add_fbthrift_python_library LIB_NAME THRIFT_FILE)
   endif()
   list(APPEND generated_sources
     "${py_output_dir}/thrift_types.py"
+    "${py_output_dir}/thrift_types.pyi"
     "${py_output_dir}/thrift_enums.py"
-    "${py_output_dir}/thrift_metadata.py"
     "${py_output_dir}/thrift_abstract_types.py"
     "${py_output_dir}/thrift_mutable_types.py"
+    "${py_output_dir}/thrift_mutable_types.pyi"
+    "${py_output_dir}/thrift_uris.txt"
+    "${py_output_dir}/thrift_reflection.py"
   )
+  if(NOT "no_metadata" IN_LIST ARG_OPTIONS)
+    list(APPEND generated_sources
+      "${py_output_dir}/thrift_metadata.py")
+  endif()
   foreach(service IN LISTS ARG_SERVICES)
     list(APPEND generated_sources
       "${py_output_dir}/thrift_clients.py"
       "${py_output_dir}/thrift_mutable_clients.py"
       "${py_output_dir}/thrift_services.py"
       "${py_output_dir}/thrift_mutable_services.py"
+      "${py_output_dir}/thrift_services_reflection.py"
     )
     break()  # Service files are per-module, not per-service
   endforeach()
@@ -209,7 +217,26 @@ function(add_fbthrift_python_library LIB_NAME THRIFT_FILE)
     "-I;$<JOIN:$<TARGET_PROPERTY:${LIB_NAME}.thrift_includes,INTERFACE_INCLUDE_DIRECTORIES>,;-I;>"
   )
 
+  foreach(option IN LISTS ARG_OPTIONS)
+    if(option MATCHES "^include_prefix=")
+      message(FATAL_ERROR
+        "add_fbthrift_python_library() computes include_prefix; do not pass "
+        "it in OPTIONS")
+    endif()
+  endforeach()
+  file(RELATIVE_PATH include_prefix
+    "${PROJECT_SOURCE_DIR}"
+    "${CMAKE_CURRENT_SOURCE_DIR}/${THRIFT_FILE}")
+  get_filename_component(include_prefix "${include_prefix}" DIRECTORY)
+  if(NOT include_prefix STREQUAL "")
+    list(APPEND ARG_OPTIONS "include_prefix=${include_prefix}")
+  endif()
+
   string(REPLACE ";" "," GEN_ARG_STR "${ARG_OPTIONS}")
+  set(GEN_SPEC "python")
+  if(NOT GEN_ARG_STR STREQUAL "")
+    string(APPEND GEN_SPEC ":${GEN_ARG_STR}")
+  endif()
 
   # mstch_python generates output at gen-python/<namespace_py3>/<basename>/
   # The CMake NAMESPACE parameter should match the "namespace py3" directive
@@ -225,7 +252,7 @@ function(add_fbthrift_python_library LIB_NAME THRIFT_FILE)
       "${CMAKE_COMMAND}" -E make_directory "${output_dir}"
     COMMAND
       "${FBTHRIFT_COMPILER}"
-      --gen "mstch_python:${GEN_ARG_STR}"
+      --gen "${GEN_SPEC}"
       "${thrift_include_options}"
       -I "${FBTHRIFT_INCLUDE_DIR}"
       -o "${output_dir}"
@@ -235,7 +262,9 @@ function(add_fbthrift_python_library LIB_NAME THRIFT_FILE)
     MAIN_DEPENDENCY
       "${THRIFT_FILE}"
     DEPENDS
+      ${ARG_DEPENDS}
       "${FBTHRIFT_COMPILER}"
+    VERBATIM
   )
 
   # Register as a python library.

@@ -49,45 +49,185 @@ function(add_fbthrift_cpp_library LIB_NAME THRIFT_FILE)
   )
   get_filename_component(include_prefix ${include_prefix} DIRECTORY)
 
-  if (NOT "${include_prefix}" STREQUAL "")
-    list(APPEND ARG_OPTIONS "include_prefix=${include_prefix}")
-  endif()
   # CMake 3.12 is finally getting a list(JOIN) function, but until then
   # treating the list as a string and replacing the semicolons is good enough.
   string(REPLACE ";" "," GEN_ARG_STR "${ARG_OPTIONS}")
 
+  if(GEN_ARG_STR MATCHES "(^|,)include_prefix=")
+    message(FATAL_ERROR
+      "add_fbthrift_cpp_library() computes include_prefix; do not pass it "
+      "in OPTIONS")
+  endif()
+
+  # layouts is a CMake-only marker: frozen2 always emits the layout source,
+  # but only targets that use valid Frozen2 layouts should compile it.
+  set(compile_frozen_layouts FALSE)
+  if("layouts" IN_LIST ARG_OPTIONS)
+    if(NOT "frozen2" IN_LIST ARG_OPTIONS)
+      message(FATAL_ERROR
+        "the CMake-only layouts marker requires OPTIONS frozen2")
+    endif()
+    set(compile_frozen_layouts TRUE)
+    list(REMOVE_ITEM ARG_OPTIONS "layouts")
+  endif()
+  if("patch" IN_LIST ARG_OPTIONS)
+    message(FATAL_ERROR
+      "add_fbthrift_cpp_library() does not own the patch companion pipeline; "
+      "use thrift_generate(... OPTIONS patch) from ThriftLibrary.cmake")
+  endif()
+  string(REPLACE ";" "," GEN_ARG_STR "${ARG_OPTIONS}")
+
+  set(codegen_dir "gen-cpp2")
+  if(GEN_ARG_STR MATCHES "(^|,)py3cpp($|,)")
+    set(codegen_dir "gen-py3cpp")
+  endif()
+
+  set(types_cpp_splits "")
+  if(GEN_ARG_STR MATCHES "(^|,)types_cpp_splits=([1-9][0-9]*)($|,)")
+    set(types_cpp_splits "${CMAKE_MATCH_2}")
+  elseif(GEN_ARG_STR MATCHES "(^|,)types_cpp_splits=")
+    message(FATAL_ERROR
+      "types_cpp_splits must be a positive integer: ${GEN_ARG_STR}")
+  endif()
+
+  set(single_file_service FALSE)
+  if(GEN_ARG_STR MATCHES "(^|,)single_file_service($|,)")
+    set(single_file_service TRUE)
+  endif()
+
+  set(client_split_services)
+  set(client_split_counts)
+  if(GEN_ARG_STR MATCHES "(^|,)client_cpp_splits=\\{([^}]*)\\}($|,)")
+    set(client_split_map "${CMAKE_MATCH_2}")
+    string(REPLACE "," ";" client_split_pairs "${client_split_map}")
+    foreach(pair IN LISTS client_split_pairs)
+      if(NOT pair MATCHES "^([^:]+):([1-9][0-9]*)$")
+        message(FATAL_ERROR "invalid client_cpp_splits pair: ${pair}")
+      endif()
+      set(split_service "${CMAKE_MATCH_1}")
+      set(split_count "${CMAKE_MATCH_2}")
+      if(NOT split_service IN_LIST ARG_SERVICES)
+        message(FATAL_ERROR
+          "client_cpp_splits names undeclared service ${split_service}")
+      endif()
+      if(split_service IN_LIST client_split_services)
+        message(FATAL_ERROR
+          "duplicate service in client_cpp_splits: ${split_service}")
+      endif()
+      list(APPEND client_split_services "${split_service}")
+      list(APPEND client_split_counts "${split_count}")
+    endforeach()
+  elseif(GEN_ARG_STR MATCHES "(^|,)client_cpp_splits=")
+    message(FATAL_ERROR "malformed client_cpp_splits: ${GEN_ARG_STR}")
+  endif()
+  if(single_file_service AND client_split_services)
+    message(FATAL_ERROR
+      "single_file_service is incompatible with client_cpp_splits")
+  endif()
+
+  if(NOT "${include_prefix}" STREQUAL "")
+    list(APPEND ARG_OPTIONS "include_prefix=${include_prefix}")
+  endif()
+  string(REPLACE ";" "," GEN_ARG_STR "${ARG_OPTIONS}")
+  set(GEN_SPEC "cpp2")
+  if(NOT GEN_ARG_STR STREQUAL "")
+    string(APPEND GEN_SPEC ":${GEN_ARG_STR}")
+  endif()
+
   # Compute the list of generated files
-  list(APPEND generated_headers
-    "${output_dir}/gen-cpp2/${base}_constants.h"
-    "${output_dir}/gen-cpp2/${base}_types.h"
-    "${output_dir}/gen-cpp2/${base}_types.tcc"
-    "${output_dir}/gen-cpp2/${base}_types_custom_protocol.h"
-    "${output_dir}/gen-cpp2/${base}_metadata.h"
+  set(generated_headers
+    "${output_dir}/${codegen_dir}/${base}_clients.h"
+    "${output_dir}/${codegen_dir}/${base}_clients_fwd.h"
+    "${output_dir}/${codegen_dir}/${base}_constants.h"
+    "${output_dir}/${codegen_dir}/${base}_data.h"
+    "${output_dir}/${codegen_dir}/${base}_handlers.h"
+    "${output_dir}/${codegen_dir}/${base}_metadata.h"
+    "${output_dir}/${codegen_dir}/${base}_types.h"
+    "${output_dir}/${codegen_dir}/${base}_types.tcc"
+    "${output_dir}/${codegen_dir}/${base}_types_custom_protocol.h"
+    "${output_dir}/${codegen_dir}/${base}_types_fwd.h"
   )
-  list(APPEND generated_sources
-    "${output_dir}/gen-cpp2/${base}_constants.cpp"
-    "${output_dir}/gen-cpp2/${base}_data.h"
-    "${output_dir}/gen-cpp2/${base}_data.cpp"
-    "${output_dir}/gen-cpp2/${base}_types.cpp"
-    "${output_dir}/gen-cpp2/${base}_types_binary.cpp"
-    "${output_dir}/gen-cpp2/${base}_types_compact.cpp"
-    "${output_dir}/gen-cpp2/${base}_types_serialization.cpp"
-    "${output_dir}/gen-cpp2/${base}_metadata.cpp"
+  set(generated_sources
+    "${output_dir}/${codegen_dir}/${base}_constants.cpp"
+    "${output_dir}/${codegen_dir}/${base}_data.cpp"
+    "${output_dir}/${codegen_dir}/${base}_sinit.cpp"
   )
-  foreach(service IN LISTS ARG_SERVICES)
-    list(APPEND generated_headers
-      "${output_dir}/gen-cpp2/${service}.h"
-      "${output_dir}/gen-cpp2/${service}.tcc"
-      "${output_dir}/gen-cpp2/${service}AsyncClient.h"
-      "${output_dir}/gen-cpp2/${service}_custom_protocol.h"
-    )
+  set(generated_byproducts)
+
+  set(type_source_stems
+    types types_binary types_compact types_serialization)
+  if(types_cpp_splits STREQUAL "")
+    foreach(stem IN LISTS type_source_stems)
+      list(APPEND generated_sources
+        "${output_dir}/${codegen_dir}/${base}_${stem}.cpp")
+    endforeach()
+  else()
+    math(EXPR last_split "${types_cpp_splits} - 1")
+    string(LENGTH "${last_split}" split_width)
+    foreach(split_id RANGE ${last_split})
+      string(LENGTH "${split_id}" split_id_width)
+      math(EXPR split_padding "${split_width} - ${split_id_width}")
+      string(REPEAT "0" ${split_padding} split_prefix)
+      foreach(stem IN LISTS type_source_stems)
+        list(APPEND generated_sources
+          "${output_dir}/${codegen_dir}/${base}_${stem}.${split_prefix}${split_id}.split.cpp")
+      endforeach()
+    endforeach()
+  endif()
+
+  if(NOT GEN_ARG_STR MATCHES "(^|,)no_metadata($|,)")
     list(APPEND generated_sources
-      "${output_dir}/gen-cpp2/${service}.cpp"
-      "${output_dir}/gen-cpp2/${service}AsyncClient.cpp"
-      "${output_dir}/gen-cpp2/${service}_processmap_binary.cpp"
-      "${output_dir}/gen-cpp2/${service}_processmap_compact.cpp"
-    )
-  endforeach()
+      "${output_dir}/${codegen_dir}/${base}_metadata.cpp")
+  endif()
+  if(GEN_ARG_STR MATCHES "(^|,)frozen2($|,)")
+    list(APPEND generated_headers
+      "${output_dir}/${codegen_dir}/${base}_layouts.h")
+    if(compile_frozen_layouts)
+      list(APPEND generated_sources
+        "${output_dir}/${codegen_dir}/${base}_layouts.cpp")
+    else()
+      list(APPEND generated_byproducts
+        "${output_dir}/${codegen_dir}/${base}_layouts.cpp")
+    endif()
+  endif()
+
+  if(single_file_service)
+    list(APPEND generated_headers
+      "${output_dir}/${codegen_dir}/${base}_handlers-inl.h")
+    list(APPEND generated_sources
+      "${output_dir}/${codegen_dir}/${base}_clients.cpp"
+      "${output_dir}/${codegen_dir}/${base}_handlers.cpp")
+  else()
+    foreach(service IN LISTS ARG_SERVICES)
+      list(APPEND generated_headers
+        "${output_dir}/${codegen_dir}/${service}.h"
+        "${output_dir}/${codegen_dir}/${service}.tcc"
+        "${output_dir}/${codegen_dir}/${service}AsyncClient.h"
+        "${output_dir}/${codegen_dir}/${service}_custom_protocol.h"
+      )
+      list(APPEND generated_sources
+        "${output_dir}/${codegen_dir}/${service}.cpp"
+        "${output_dir}/${codegen_dir}/${service}_processmap_binary.cpp"
+        "${output_dir}/${codegen_dir}/${service}_processmap_compact.cpp"
+      )
+      list(FIND client_split_services "${service}" client_split_index)
+      if(client_split_index EQUAL -1)
+        list(APPEND generated_sources
+          "${output_dir}/${codegen_dir}/${service}AsyncClient.cpp")
+      else()
+        list(GET client_split_counts ${client_split_index} split_count)
+        math(EXPR last_split "${split_count} - 1")
+        string(LENGTH "${last_split}" split_width)
+        foreach(split_id RANGE ${last_split})
+          string(LENGTH "${split_id}" split_id_width)
+          math(EXPR split_padding "${split_width} - ${split_id_width}")
+          string(REPEAT "0" ${split_padding} split_prefix)
+          list(APPEND generated_sources
+            "${output_dir}/${codegen_dir}/${service}.${split_prefix}${split_id}.async_client_split.cpp")
+        endforeach()
+      endif()
+    endforeach()
+  endif()
 
   # This generator expression gets the list of include directories required
   # for all of our dependencies.
@@ -97,8 +237,8 @@ function(add_fbthrift_cpp_library LIB_NAME THRIFT_FILE)
   # to use a wrapper script around the thrift compiler that could take the
   # include list as a single argument and split it up before invoking the
   # thrift compiler.
-  if (NOT POLICY CMP0067)
-    message(FATAL_ERROR "add_fbthrift_cpp_library() requires CMake 3.8+")
+  if (CMAKE_VERSION VERSION_LESS 3.12)
+    message(FATAL_ERROR "add_fbthrift_cpp_library() requires CMake 3.12+")
   endif()
   set(
     thrift_include_options
@@ -110,13 +250,15 @@ function(add_fbthrift_cpp_library LIB_NAME THRIFT_FILE)
     OUTPUT
       ${generated_headers}
       ${generated_sources}
+    BYPRODUCTS
+      ${generated_byproducts}
     COMMAND_EXPAND_LISTS
     COMMAND
       "${CMAKE_COMMAND}" -E make_directory "${output_dir}"
     COMMAND
       "${FBTHRIFT_COMPILER}"
       --legacy-strict
-      --gen "mstch_cpp2:${GEN_ARG_STR}"
+      --gen "${GEN_SPEC}"
       "${thrift_include_options}"
       -I "${FBTHRIFT_INCLUDE_DIR}"
       -o "${output_dir}"
@@ -128,6 +270,7 @@ function(add_fbthrift_cpp_library LIB_NAME THRIFT_FILE)
     DEPENDS
       ${ARG_DEPENDS}
       "${FBTHRIFT_COMPILER}"
+    VERBATIM
   )
 
   # Now emit the library rule to compile the sources
@@ -197,6 +340,6 @@ function(add_fbthrift_cpp_library LIB_NAME THRIFT_FILE)
     PROPERTIES
       EXPORT_PROPERTIES "THRIFT_INSTALL_DIR"
       THRIFT_INSTALL_DIR "${ARG_THRIFT_INCLUDE_DIR}/${include_prefix}"
-      HEADER_INSTALL_DIR "${ARG_INCLUDE_DIR}/${include_prefix}/gen-cpp2"
+      HEADER_INSTALL_DIR "${ARG_INCLUDE_DIR}/${include_prefix}/${codegen_dir}"
   )
 endfunction()

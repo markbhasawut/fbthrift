@@ -15,10 +15,10 @@ builder = nop
 subdir = .
 
 [install.files]
-fatal/portability.h = fatal/portability.h
-fatal/preprocessor.h = fatal/preprocessor.h
-fatal/container = fatal/container
-fatal/functional = fatal/functional
-fatal/math = fatal/math
-fatal/string = fatal/string
-fatal/type = fatal/type
+fatal/portability.h = include/fatal/portability.h
+fatal/preprocessor.h = include/fatal/preprocessor.h
+fatal/container = include/fatal/container
+fatal/functional = include/fatal/functional
+fatal/math = include/fatal/math
+fatal/string = include/fatal/string
+fatal/type = include/fatal/type

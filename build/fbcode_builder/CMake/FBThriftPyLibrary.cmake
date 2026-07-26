@@ -26,6 +26,15 @@ function(add_fbthrift_py_library LIB_NAME THRIFT_FILE)
 
   string(REPLACE "." "/" namespace_dir "${ARG_NAMESPACE}")
   set(py_output_dir "${output_dir}/gen-py/${namespace_dir}")
+  set(generated_byproducts "${output_dir}/gen-py/__init__.py")
+  set(package_path "${output_dir}/gen-py")
+  string(REPLACE "/" ";" package_parts "${namespace_dir}")
+  foreach(package_part IN LISTS package_parts)
+    string(APPEND package_path "/${package_part}")
+    if(NOT package_path STREQUAL py_output_dir)
+      list(APPEND generated_byproducts "${package_path}/__init__.py")
+    endif()
+  endforeach()
   list(APPEND generated_sources
     "${py_output_dir}/__init__.py"
     "${py_output_dir}/ttypes.py"
@@ -34,6 +43,10 @@ function(add_fbthrift_py_library LIB_NAME THRIFT_FILE)
   foreach(service IN LISTS ARG_SERVICES)
     list(APPEND generated_sources
       ${py_output_dir}/${service}.py
+    )
+    list(APPEND generated_byproducts
+      ${py_output_dir}/${service}-remote
+      ${py_output_dir}/${service}-fuzzer
     )
   endforeach()
 
@@ -69,24 +82,29 @@ function(add_fbthrift_py_library LIB_NAME THRIFT_FILE)
     "-I;$<JOIN:$<TARGET_PROPERTY:${LIB_NAME}.thrift_includes,INTERFACE_INCLUDE_DIRECTORIES>,;-I;>"
   )
 
-  # Always force generation of "new-style" python classes for Python 2
-  list(APPEND ARG_OPTIONS "new_style")
   # CMake 3.12 is finally getting a list(JOIN) function, but until then
   # treating the list as a string and replacing the semicolons is good enough.
   string(REPLACE ";" "," GEN_ARG_STR "${ARG_OPTIONS}")
+  set(GEN_SPEC "py")
+  if(NOT GEN_ARG_STR STREQUAL "")
+    string(APPEND GEN_SPEC ":${GEN_ARG_STR}")
+  endif()
 
   # Emit the rule to run the thrift compiler
   add_custom_command(
     OUTPUT
       ${generated_sources}
+    BYPRODUCTS
+      ${generated_byproducts}
     COMMAND_EXPAND_LISTS
     COMMAND
       "${CMAKE_COMMAND}" -E make_directory "${output_dir}"
     COMMAND
       "${FBTHRIFT_COMPILER}"
       --legacy-strict
-      --gen "py:${GEN_ARG_STR}"
+      --gen "${GEN_SPEC}"
       "${thrift_include_options}"
+      -I "${FBTHRIFT_INCLUDE_DIR}"
       -o "${output_dir}"
       "${CMAKE_CURRENT_SOURCE_DIR}/${THRIFT_FILE}"
     WORKING_DIRECTORY
@@ -94,7 +112,9 @@ function(add_fbthrift_py_library LIB_NAME THRIFT_FILE)
     MAIN_DEPENDENCY
       "${THRIFT_FILE}"
     DEPENDS
+      ${ARG_DEPENDS}
       "${FBTHRIFT_COMPILER}"
+    VERBATIM
   )
 
   # We always want to pass the namespace as "" to this call:

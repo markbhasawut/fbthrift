@@ -5,7 +5,9 @@ shipit_project = folly
 shipit_fbcode_builder = true
 
 [git]
-repo_url = https://github.com/facebook/folly.git
+repo_url = https://github.com/markbhasawut/folly.git
+branch = oss-fixes
+rev = c9c17f2ca5e6617213d74bd072d59a4fb215d993
 
 [build]
 builder = cmake

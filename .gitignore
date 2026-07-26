@@ -51,4 +51,8 @@ cmake_install.cmake
 /compile_commands.json
 /thrift/lib/java/**/target
 
-/build/
+/build/*
+!/build/fbcode_builder/
+!/build/fbcode_builder/**
+
+.cache/

@@ -39,15 +39,22 @@ shared_libs =
 [cmake.defines.feature_rpc=off]
 THRIFT_RPC=OFF
 
+[cmake.defines.feature_rpc=on]
+THRIFT_HTTP2=ON
+
 [cmake.defines.feature_benchmark=off]
 THRIFT_BENCHMARKS=OFF
 
 [dependencies]
+fatal
 fmt
 folly
 googletest
-zstd
+range-v3
+re2
 xxhash
+zstd
+
 # Thrift also depends on openssl but since the latter requires a platform-
 # specific configuration we rely on the folly manifest to provide this
 # dependency to avoid duplication.
@@ -59,6 +66,7 @@ fizz
 libsodium
 wangle
 mvfst
+proxygen
 
 # Pulled only when benchmark executables are enabled; gated inside fbthrift's
 # CMake by THRIFT_BENCHMARKS=ON.

@@ -689,13 +689,13 @@ class t_mstch_java_generator : public t_whisker_generator {
           constexpr int kActionReport = 1;
 
           if (const t_const* annotation =
-                  self.find_structured_annotation_or_null(kStringsUri)) {
+                  t_typedef::get_first_structured_annotation_or_null(
+                      &self.type().deref(), kStringsUri)) {
             return is_annotation_map_field_equal(
                 annotation, kOnInvalidUtf8, kActionReport);
           }
           if (const t_const* annotation =
-                  t_typedef::get_first_structured_annotation_or_null(
-                      &self.type().deref(), kStringsUri)) {
+                  self.find_structured_annotation_or_null(kStringsUri)) {
             return is_annotation_map_field_equal(
                 annotation, kOnInvalidUtf8, kActionReport);
           }

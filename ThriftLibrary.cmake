@@ -27,7 +27,8 @@
 # Params:
 #   @file_name - The name of the thrift file
 #   @services  - A list of services that are declared in the thrift file
-#   @language  - The generator to use (cpp, cpp2, py, py3, or python)
+#   @language  - The generator to use (cpp, cpp2, py, py3, python, rust, go,
+#       java, javadeprecated, or android_lite)
 #   @options   - Extra options to pass to the generator
 #   @file_path - The directory where the thrift file lives
 #   @output_path - The directory where the thrift objects will be built
@@ -156,7 +157,11 @@ macro(thrift_library
     # Create a dependency-only target; packaging/extension compilation remains
     # explicit so py3 does not acquire an implicit dependency cycle through its
     # companion cpp2 output.
-    add_custom_target("${file_name}-${language}" ALL)
+    if("EXCLUDE_FROM_ALL" IN_LIST ARGN)
+      add_custom_target("${file_name}-${language}")
+    else()
+      add_custom_target("${file_name}-${language}" ALL)
+    endif()
     add_dependencies("${file_name}-${language}" "${file_name}-${language}-target")
     message("Thrift will create the ${language} codegen target : ${file_name}-${language}")
   endif()
@@ -188,7 +193,8 @@ endmacro()
 #   @file_name - Input file name. Will be used for naming the CMake
 #       target if TARGET_NAME_BASE is not specified.
 #   @services  - A list of services that are declared in the thrift file
-#   @language  - The generator to use (cpp, cpp2, py, py3, or python)
+#   @language  - The generator to use (cpp, cpp2, py, py3, python, rust, go,
+#       java, javadeprecated, or android_lite)
 #   @options   - Extra options to pass to the generator
 #   @output_path - The directory where the thrift file lives
 #   @include_prefix - Prefix to use for thrift includes in generated sources
@@ -198,6 +204,8 @@ endmacro()
 #       Defaults to ${THRIFT1}.
 #   @INJECT_SCHEMA (optional) - inject the compact bundled schema constant.
 #       This requires a compiler linked with the AST/schema generator.
+#   @EXCLUDE_FROM_ALL (optional) - create an opt-in codegen target rather than
+#       adding it to the default build graph.
 #   @NAMESPACE (optional) - Output namespace for Python-family generators.
 #       It must match namespace py (or py.asyncio) for py, and namespace py3
 #       for py3/python. Dot-separated values map to output directories.
@@ -224,7 +232,7 @@ macro(thrift_generate
   include_prefix
 )
   cmake_parse_arguments(THRIFT_GENERATE   # Prefix
-    "INJECT_SCHEMA;NO_INSTALL" # Options
+    "EXCLUDE_FROM_ALL;INJECT_SCHEMA;NO_INSTALL" # Options
     "COMPILER;TARGET_NAME_BASE;NAMESPACE" # One Value args
     "THRIFT_INCLUDE_DIRECTORIES" # Multi-value args
     "${ARGN}")
@@ -253,6 +261,7 @@ macro(thrift_generate
   endif()
 
   set(thrift_is_cpp FALSE)
+  set(thrift_uses_codegen_stamp FALSE)
   if("${language}" STREQUAL "cpp" OR "${language}" STREQUAL "cpp2")
     set(thrift_is_cpp TRUE)
     set(gen_language "mstch_cpp2")
@@ -266,10 +275,31 @@ macro(thrift_generate
   elseif("${language}" STREQUAL "python")
     set(gen_language "mstch_python")
     set(thrift_codegen_output_directory "gen-python")
+  elseif("${language}" STREQUAL "rust")
+    set(gen_language "mstch_rust")
+    set(thrift_codegen_output_directory "gen-rust")
+    set(thrift_uses_codegen_stamp TRUE)
+  elseif("${language}" STREQUAL "go")
+    set(gen_language "mstch_go")
+    set(thrift_codegen_output_directory "gen-go")
+    set(thrift_uses_codegen_stamp TRUE)
+  elseif("${language}" STREQUAL "java")
+    set(gen_language "mstch_java")
+    set(thrift_codegen_output_directory "gen-java")
+    set(thrift_uses_codegen_stamp TRUE)
+  elseif("${language}" STREQUAL "javadeprecated")
+    set(gen_language "java_deprecated")
+    set(thrift_codegen_output_directory "gen-javadeprecated")
+    set(thrift_uses_codegen_stamp TRUE)
+  elseif("${language}" STREQUAL "android_lite")
+    set(gen_language "android")
+    set(thrift_codegen_output_directory "gen-android")
+    set(thrift_uses_codegen_stamp TRUE)
   else()
     message(FATAL_ERROR
       "Unsupported thrift_generate language '${language}'. Supported "
-      "languages are cpp, cpp2, py, py3, and python")
+      "languages are cpp, cpp2, py, py3, python, rust, go, java, "
+      "javadeprecated, and android_lite")
   endif()
 
   # "layouts" and "patch" are CMake-only markers. "layouts" controls whether
@@ -314,6 +344,21 @@ macro(thrift_generate
   set("${target_file_name}-${language}-SOURCES")
   set(thrift_codegen_byproducts)
   set(thrift_post_codegen_commands)
+
+  if(thrift_uses_codegen_stamp)
+    # These generators emit an AST- and option-dependent set of files. A stamp
+    # is the stable CMake output contract; the native language build consumes
+    # the output directory rather than a configure-time file enumeration.
+    set(thrift_codegen_stamp
+      "${output_path}/${thrift_codegen_output_directory}/.${target_file_name}-${language}.stamp")
+    set("${target_file_name}-${language}-OUTPUT_DIRECTORY"
+      "${output_path}/${thrift_codegen_output_directory}")
+    set("${target_file_name}-${language}-STAMP" "${thrift_codegen_stamp}")
+    list(APPEND "${target_file_name}-${language}-SOURCES"
+      "${thrift_codegen_stamp}")
+    list(APPEND thrift_post_codegen_commands
+      COMMAND ${CMAKE_COMMAND} -E touch "${thrift_codegen_stamp}")
+  endif()
 
   if(thrift_is_cpp)
 
@@ -737,7 +782,11 @@ macro(thrift_generate
 
   set(thrift_effective_option_list ${thrift_codegen_option_list})
   if(NOT "${include_prefix}" STREQUAL "" AND
-     NOT "${language}" STREQUAL "py")
+     NOT "${language}" STREQUAL "py" AND
+     NOT "${language}" STREQUAL "go" AND
+     NOT "${language}" STREQUAL "java" AND
+     NOT "${language}" STREQUAL "javadeprecated" AND
+     NOT "${language}" STREQUAL "android_lite")
     foreach(thrift_codegen_option ${thrift_codegen_option_list})
       if(thrift_codegen_option MATCHES "^include_prefix=")
         message(FATAL_ERROR
@@ -773,12 +822,21 @@ macro(thrift_generate
     COMMENT
       "Generating ${target_file_name} ${language} files. Output: ${output_path}"
   )
-  add_custom_target(
-    ${target_file_name}-${language}-target ALL
-    DEPENDS ${thrift_patch_codegen_outputs}
-      ${${target_file_name}-${language}-HEADERS}
-      ${${target_file_name}-${language}-SOURCES}
-  )
+  if(THRIFT_GENERATE_EXCLUDE_FROM_ALL)
+    add_custom_target(
+      ${target_file_name}-${language}-target
+      DEPENDS ${thrift_patch_codegen_outputs}
+        ${${target_file_name}-${language}-HEADERS}
+        ${${target_file_name}-${language}-SOURCES}
+    )
+  else()
+    add_custom_target(
+      ${target_file_name}-${language}-target ALL
+      DEPENDS ${thrift_patch_codegen_outputs}
+        ${${target_file_name}-${language}-HEADERS}
+        ${${target_file_name}-${language}-SOURCES}
+    )
+  endif()
   if(thrift_is_cpp AND NOT THRIFT_GENERATE_NO_INSTALL)
     install(
       DIRECTORY "${output_path}/${thrift_codegen_output_directory}"

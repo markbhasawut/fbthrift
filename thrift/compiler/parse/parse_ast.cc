@@ -46,14 +46,6 @@ using apache::thrift::detail::bundled_lib_thrift_files;
 
 namespace apache::thrift::compiler {
 namespace {
-constexpr bool should_bundle_std_files() {
-#ifdef THRIFT_OSS
-  return false;
-#else
-  return true;
-#endif
-}
-
 // Cleans up text commonly found in doxygen-like comments.
 //
 // Warning: mixing tabs and spaces may mess up formatting.
@@ -943,21 +935,19 @@ std::unique_ptr<t_program_bundle> parse_ast(
     t_program_bundle* already_parsed) {
   const bool allow_self_relative_includes = params.allow_self_relative_includes;
 
-  if constexpr (should_bundle_std_files()) {
-    const auto parent_path = allow_self_relative_includes
-        ? std::optional<std::string_view>(path)
-        : std::nullopt;
-    for (const auto& annotation_files :
-         {bundled_annotation_files(),
-          bundled_lib_thrift_files(),
-          bundled_conformance_if_files()}) {
-      for (const auto& [annot_path, content] : annotation_files) {
-        auto found_or_error = sm.find_include_file(
-            annot_path, params.incl_searchpath, parent_path);
-        if (found_or_error.index() != 0) {
-          // Fall back to the bundled annotation files.
-          sm.add_virtual_file(annot_path, content);
-        }
+  const auto parent_path = allow_self_relative_includes
+      ? std::optional<std::string_view>(path)
+      : std::nullopt;
+  for (const auto& standard_files :
+       {bundled_annotation_files(),
+        bundled_lib_thrift_files(),
+        bundled_conformance_if_files()}) {
+    for (const auto& [standard_path, content] : standard_files) {
+      auto found_or_error = sm.find_include_file(
+          standard_path, params.incl_searchpath, parent_path);
+      if (found_or_error.index() != 0) {
+        // A filesystem include wins; otherwise use the compiler-matched copy.
+        sm.add_virtual_file(standard_path, content);
       }
     }
   }

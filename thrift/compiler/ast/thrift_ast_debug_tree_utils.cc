@@ -299,7 +299,7 @@ scope& addChildForField(
       parent_scope.make_child("{} [t_field] @{:#x}", prefix, uintptr_t(&field));
   addChildForNamed("(base)", field, fieldScope);
 
-  fieldScope.make_child("qualifier: {}", field.qualifier());
+  fieldScope.make_child("qualifier: {}", static_cast<int>(field.qualifier()));
   fieldScope.make_child("id: {}", field.id());
   std::optional<t_field_id> explicitId = field.explicit_id();
   if (explicitId.has_value()) {
@@ -340,9 +340,9 @@ scope& addChildForException(
       "{} [t_exception] @{:#x}", prefix, uintptr_t(&exception));
 
   addChildForStructured("(base)", exception, exceptionScope);
-  exceptionScope.make_child("kind: {}", exception.kind());
-  exceptionScope.make_child("blame: {}", exception.blame());
-  exceptionScope.make_child("safety: {}", exception.safety());
+  exceptionScope.make_child("kind: {}", static_cast<int>(exception.kind()));
+  exceptionScope.make_child("blame: {}", static_cast<int>(exception.blame()));
+  exceptionScope.make_child("safety: {}", static_cast<int>(exception.safety()));
 
   exceptionScope.make_child(
       "message_field: [t_field*] {:#x}",
@@ -386,7 +386,7 @@ scope& addChildForFunction(
     functionScope.make_child("exceptions: N/A");
   }
 
-  functionScope.make_child("qualifier: {}", function.qualifier());
+  functionScope.make_child("qualifier: {}", static_cast<int>(function.qualifier()));
 
   const t_node* sinkOrStream = function.sink_or_stream();
   if (sinkOrStream != nullptr) {

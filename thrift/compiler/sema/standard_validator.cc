@@ -63,6 +63,16 @@ namespace apache::thrift::compiler {
 namespace {
 using cpp2::OrderableTypeUtils;
 
+#ifdef THRIFT_OSS
+constexpr std::string_view kPackageDirectiveMigrationReference;
+constexpr std::string_view kMissingUriMigrationReference;
+#else
+constexpr std::string_view kPackageDirectiveMigrationReference =
+    " (see https://fburl.com/thrift-uri-add-package).";
+constexpr std::string_view kMissingUriMigrationReference =
+    " For more details, see https://fburl.com/thrift-uri-add-package";
+#endif
+
 const t_structured* get_mixin_type(const t_field& field) {
   if (cpp2::is_mixin(field)) {
     return dynamic_cast<const t_structured*>(field.type()->get_true_type());
@@ -546,7 +556,8 @@ void validate_program_package(sema_context& ctx, const t_program& program) {
         program,
         validation_to_diagnostic_level(level),
         "Thrift file is missing a `package` directive. This will soon become "
-        "an error (see https://fburl.com/thrift-uri-add-package).");
+        "an error{}",
+        kPackageDirectiveMigrationReference);
     return;
   }
 
@@ -558,7 +569,8 @@ void validate_program_package(sema_context& ctx, const t_program& program) {
         validation_to_diagnostic_level(
             ctx.sema_parameters().empty_or_no_package),
         "Thrift file should have a (non-empty) package. This will soon become "
-        "an error (see https://fburl.com/thrift-uri-add-package).");
+        "an error{}",
+        kPackageDirectiveMigrationReference);
     return;
   }
 
@@ -1183,9 +1195,9 @@ void validate_missing_uris(sema_context& ctx, const t_program& program) {
           node,
           validation_to_diagnostic_level(ctx.sema_parameters().missing_uris),
           "Definition `{}` requires a URI: add a non-empty package to the "
-          "file, or annotate the type with @thrift.Uri. For more details, "
-          "see https://fburl.com/thrift-uri-add-package",
-          node.name());
+          "file, or annotate the type with @thrift.Uri.{}",
+          node.name(),
+          kMissingUriMigrationReference);
     }
   });
   ast_visitor(program);

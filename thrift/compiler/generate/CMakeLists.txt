@@ -38,7 +38,7 @@ add_custom_command(
 )
 
 file(GLOB GENERATOR_FILES RELATIVE ${CMAKE_CURRENT_SOURCE_DIR} *.cc)
-list(REMOVE_ITEM GENERATOR_FILES build_templates.cc)
+list(REMOVE_ITEM GENERATOR_FILES build_templates.cc t_ast_generator.cc schema_populator.cc)
 list(APPEND GENERATOR_FILES ${CMAKE_CURRENT_SOURCE_DIR}/cpp/orderable_type_utils.cc)
 
 add_library(compiler_generators STATIC ${GENERATOR_FILES}
@@ -64,3 +64,32 @@ target_link_libraries(
   whisker
   ${OPENSSL_LIBRARIES}
 )
+
+# Schema injection serializes generated thrift schema types, so it cannot be
+# part of the compiler which generates those same runtime types. In a full-tree
+# build, compile it as a second-stage generator archive after the runtime.
+if(build_all)
+  add_library(
+    compiler_schema_generators
+    STATIC
+    t_ast_generator.cc
+    schema_populator.cc
+  )
+  set_target_properties(
+    compiler_schema_generators
+    PROPERTIES POSITION_INDEPENDENT_CODE ON
+  )
+  target_link_libraries(
+    compiler_schema_generators
+    compiler_generators
+    compiler_ast
+    compiler_base
+    compiler_lib
+    compiler
+    whisker
+    thriftmetadata
+    thriftprotocol
+    thrifttyperep
+    ${OPENSSL_LIBRARIES}
+  )
+endif()

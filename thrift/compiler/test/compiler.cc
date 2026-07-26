@@ -141,6 +141,19 @@ std::vector<diagnostic> extract_expected_diagnostics(
             : std::stoi(ln_no_str);
       }
       auto name = std::string(name_match);
+      auto message = std::string(message_match);
+#ifdef THRIFT_OSS
+      // Internal tests retain their documentation references. OSS diagnostics
+      // intentionally omit links that are inaccessible outside Meta.
+      re2::RE2::GlobalReplace(
+          &message,
+          R"( \(see https://fburl\.com/thrift-uri-add-package\)\.)",
+          "");
+      re2::RE2::GlobalReplace(
+          &message,
+          R"( For more details, see https://fburl\.com/thrift-uri-add-package)",
+          "");
+#endif
       if ((!original_match.empty() || !replacement_match.empty()) &&
           !column_match.empty()) {
         auto col_str = std::string(column_match);
@@ -155,14 +168,14 @@ std::vector<diagnostic> extract_expected_diagnostics(
 
         result.emplace_back(
             level,
-            std::string(message_match),
+            message,
             file_name,
             line_num,
             name,
             fixit(original, replacement, line_num, col_num));
       } else {
         result.emplace_back(
-            level, std::string(message_match), file_name, line_num, name);
+            level, message, file_name, line_num, name);
       }
     }
 

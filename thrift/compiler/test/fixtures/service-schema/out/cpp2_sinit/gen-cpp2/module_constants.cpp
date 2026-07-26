@@ -31,9 +31,11 @@ namespace module_constants {
   return ::folly::range(includes);
 }
 ::folly::Range<const ::std::string_view*> _fbthrift_schema_db27c1f89cb27d2_uris() {
-  static const ::std::array<::std::string_view, 2> uris = {
+  static const ::std::array<::std::string_view, 4> uris = {
     "facebook.com/thrift/test/fixtures/service_schema/CustomException",
     "facebook.com/thrift/test/fixtures/service_schema/Result",
+    "facebook.com/thrift/test/fixtures/service_schema/PrimitivesService",
+    "facebook.com/thrift/test/fixtures/service_schema/ExtendedService",
   };
   return ::folly::range(uris);
 }

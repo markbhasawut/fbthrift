@@ -16,6 +16,7 @@
 
 #include <algorithm>
 #include <cstddef>
+#include <cstdio>
 #include <filesystem>
 #include <fstream>
 #include <iterator>
@@ -44,6 +45,7 @@ using lines_t = std::vector<std::string>;
 
 void populate_one_file(
     const fs::path& root,
+    const fs::path& directory,
     std::map<std::string, lines_t>& out,
     const fs::path& path) {
   std::ifstream file(path);
@@ -55,21 +57,22 @@ void populate_one_file(
   // .thrift files should always end with a trailing newline.
   lines.emplace_back();
 
-  std::string key = fmt::format(
-      "{}/{}", root.generic_string(), path.lexically_normal().generic_string());
+  const auto relative_path = fs::relative(path, directory).lexically_normal();
+  std::string key = (root / relative_path).generic_string();
   out[std::move(key)] = std::move(lines);
 }
 
 void populate_recursively(
     const fs::path& root,
+    const fs::path& directory,
     std::map<std::string, lines_t>& out,
     const fs::path& path) {
   for (const auto& entry : fs::directory_iterator(path)) {
     const auto& filepath = entry.path();
     if (entry.is_directory()) {
-      populate_recursively(root, out, filepath);
+      populate_recursively(root, directory, out, filepath);
     } else if (entry.is_regular_file() && filepath.extension() == ".thrift") {
-      populate_one_file(root, out, filepath);
+      populate_one_file(root, directory, out, filepath);
     }
   }
 }
@@ -138,8 +141,11 @@ void print_all_files(
 } // namespace
 
 int main(int argc, char** argv) {
-  if (argc != 4) {
-    fmt::print(stderr, "Usage: {} ROOT FUNCTION_NAME DIRECTORY\n", argv[0]);
+  if (argc != 4 && argc != 5) {
+    fmt::print(
+        stderr,
+        "Usage: {} ROOT FUNCTION_NAME DIRECTORY [OUTPUT_FILE]\n",
+        argv[0]);
     return 1;
   }
 
@@ -149,6 +155,10 @@ int main(int argc, char** argv) {
   const auto function_name = std::string(argv[2]);
   // The directory to read files from.
   const auto directory = fs::path(argv[3]);
+  if (argc == 5 && std::freopen(argv[4], "w", stdout) == nullptr) {
+    fmt::print(stderr, "Could not open output file: {}\n", argv[4]);
+    return 1;
+  }
 
   // Print the header.
   fmt::print(
@@ -161,7 +171,7 @@ int main(int argc, char** argv) {
 
   // Read the files.
   std::map<std::string, lines_t> files;
-  populate_recursively(root, files, directory);
+  populate_recursively(root, directory, files, directory);
 
   // Print the content.
   print_all_files(function_name, files);

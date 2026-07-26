@@ -29,8 +29,13 @@
 namespace apache::thrift::compiler::codemod {
 
 inline constexpr auto kDefaultDomain = "meta.com";
+#ifdef THRIFT_OSS
+inline constexpr auto kBackwardsCompatibleNamespaceComment =
+    "// Retained for backwards compatibility";
+#else
 inline constexpr auto kBackwardsCompatibleNamespaceComment =
     "// Maybe unused, see https://fburl.com/thrift-namespace-backwards-compatibility";
+#endif
 
 class package_name_generator {
  public:

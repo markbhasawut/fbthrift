@@ -61,7 +61,8 @@ public class FBThriftMojo extends AbstractMojo {
   /** The path to and options for the thrift compiler. */
   @Parameter private Compiler compiler;
 
-  @Parameter(defaultValue = "java-deprecated")
+  /** Public FBThrift generator name. Use {@code java} or {@code javadeprecated}. */
+  @Parameter(defaultValue = "java")
   private String generator;
 
   @Parameter(defaultValue = "${project}")

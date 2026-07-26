@@ -49,7 +49,10 @@ cmake_install.cmake
 /build/bin
 /build/thrift
 /compile_commands.json
+/thrift/conformance/java/target
+/thrift/lib/android_lite/target
 /thrift/lib/java/**/target
+/thrift/lib/javadeprecated/target
 
 /build/*
 !/build/fbcode_builder/

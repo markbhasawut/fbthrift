@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>com.facebook.fbthrift</groupId>
+    <artifactId>fbthrift-java-parent</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+    <relativePath>../../lib/java/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>java-conformance</artifactId>
+  <name>FBThrift Java conformance executables</name>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.facebook.fbthrift</groupId>
+      <artifactId>runtime</artifactId>
+    </dependency>
+    <dependency>
+      <groupId>io.projectreactor</groupId>
+      <artifactId>reactor-test</artifactId>
+      <version>${reactor.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>3.1.0</version>
+        <executions>
+          <execution>
+            <id>generate-conformance-thrift</id>
+            <phase>generate-sources</phase>
+            <goals><goal>run</goal></goals>
+            <configuration>
+              <target>
+                <mkdir dir="${project.build.directory}/generated-sources/thrift"/>
+                <apply executable="${fbthrift.compiler}" failonerror="true" parallel="false">
+                  <arg value="-I"/>
+                  <arg value="${fbthrift.source.root}"/>
+                  <arg value="--gen"/>
+                  <arg value="java:separate_data_type_from_services"/>
+                  <arg value="-o"/>
+                  <arg value="${project.build.directory}/generated-sources/thrift"/>
+                  <srcfile/>
+                  <fileset dir="${fbthrift.source.root}/thrift/conformance/if">
+                    <include name="*.thrift"/>
+                    <exclude name="any.thrift"/>
+                    <exclude name="protocol.thrift"/>
+                  </fileset>
+                </apply>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.codehaus.mojo</groupId>
+        <artifactId>build-helper-maven-plugin</artifactId>
+        <version>3.6.1</version>
+        <executions>
+          <execution>
+            <id>add-conformance-sources</id>
+            <phase>generate-sources</phase>
+            <goals><goal>add-source</goal></goals>
+            <configuration>
+              <sources>
+                <source>${project.build.directory}/generated-sources/thrift/gen-java/data-type</source>
+                <source>${project.build.directory}/generated-sources/thrift/gen-java/services</source>
+              </sources>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

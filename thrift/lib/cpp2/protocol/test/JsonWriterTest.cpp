@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <thrift/lib/cpp2/protocol/Json5Protocol.h>
 #include <thrift/lib/cpp2/protocol/detail/JsonWriter.h>
 
 #include <limits>
@@ -447,3 +448,15 @@ TEST_P(JsonWriterTest, NoSetOutput) {
 
 } // namespace
 } // namespace apache::thrift::json5::detail
+
+namespace apache::thrift {
+namespace {
+
+TEST(Json5PublicApiTest, PrimitiveRoundTrip) {
+  const auto encoded = Json5ProtocolUtils::toJson5<type::i32_t>(42);
+  EXPECT_EQ(encoded, "42");
+  EXPECT_EQ(Json5ProtocolUtils::fromJson5<type::i32_t>(encoded), 42);
+}
+
+} // namespace
+} // namespace apache::thrift

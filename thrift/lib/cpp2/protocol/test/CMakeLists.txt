@@ -44,6 +44,8 @@ set(PROTOCOL_TESTS
    F14RoundTripTest
    InterfaceTest
    JSONProtocolTest
+   JsonReaderTest
+   JsonWriterTest
    ProtocolReaderStructReadStateTest
    ProtocolTest
    SimpleJSONProtocolTest

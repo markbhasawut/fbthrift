@@ -133,22 +133,30 @@ CMake options:
 
 ### Thrift Files
 
-When using thrift and the CMake build system, include: `ThriftLibrary.cmake` in
-your project. This includes the following macro to help building Thrift files:
+When using thrift and the CMake build system, include `ThriftLibrary.cmake` in
+your project. It defines the following macro for generated libraries:
 
-    thrift_library(
-      #file_name
-      #services
-      #language
-      #options
-      #file_path
-      #output_path
-    )
+```cmake
+thrift_library(
+  # file_name (without .thrift)
+  # services
+  # language: cpp, cpp2, py, py3, or python
+  # comma-separated generator options
+  # file_path
+  # output_path
+  # include_prefix
+)
+```
 
 This generates a library called `file_name-<language>`. That is, for
 `Test.thrift` compiled as cpp2, it will generate the library `Test-cpp2`.
 This should be added as a dependency to any source or header file that contains
 an include to generated code.
+
+See the [CMake code-generation guide](thrift/doc/languages/cmake.md), the
+[compiler-matched generator options](thrift/doc/languages/cpp/code-generation.md),
+and the [standard IDL libraries](thrift/doc/features/standard-idl-libraries.md)
+for package discovery, Python backends, annotations, Any, and Patch.
 
 ### Python Build (thrift-python)
 

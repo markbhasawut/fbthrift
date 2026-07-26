@@ -39,7 +39,10 @@ struct ThriftStruct {
 The representation of unqualified, optional, required, and terse fields in serialized data are identical.
 
 :::caution
-When `deprecated_terse_writes` is enabled in `thrift_cpp2_options`, primitive and container unqualified fields will skip serialzation if they are equal to the [standard default value](../../idl/#default-values).
+The removed `deprecated_terse_writes` cpp2 option globally changed unqualified
+field serialization. Do not pass it to current compilers. Prefer the
+per-field `@thrift.TerseWrite` annotation; migrate legacy
+`@cpp.DeprecatedTerseWrite` annotations when possible.
 :::
 
 :::caution

@@ -394,6 +394,25 @@ The package name may be omitted to allow applying annotations to a file before a
 package;
 ```
 
+Definitions which require universal names still have no URI when the package
+is explicitly empty. Existing IDLs can opt out of that validation at file
+scope while they migrate to a non-empty package:
+
+```thrift
+include "thrift/annotation/thrift.thrift"
+
+@thrift.AllowLegacyMissingUris
+package;
+
+struct ExistingType {}
+```
+
+This is a single, explicitly empty package declaration. Do not add a second
+`package "..."` declaration to the same file. The annotation applies to every
+struct, union, exception, and enum in that file which would otherwise require
+a URI; it does not assign a package or URI. New IDLs should use a non-empty
+package, and migrated IDLs should remove the annotation.
+
 ### Namespace Directives
 
 ```grammar

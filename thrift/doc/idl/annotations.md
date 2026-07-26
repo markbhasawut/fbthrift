@@ -113,7 +113,39 @@ Unrecognized unstructured annotations are *silently ignored*. So, for example, p
 
 ## Standard Annotations
 
-The standard Thrift annotation library is a set of structured annotations defined in `cpp.thrift`, `thrift.thrift`, etc. located in `thrift/annotation`.
+The standard Thrift annotation library is defined in `thrift/annotation`.
+Include files by their repository-relative paths; the basename is the qualifier
+used at annotation sites:
+
+```thrift
+include "thrift/annotation/thrift.thrift"
+include "thrift/annotation/cpp.thrift"
+include "thrift/annotation/python.thrift"
+
+@thrift.Uri{value = "example.com/project/Record"}
+struct Record {
+  @cpp.Adapter{name = "::project::TimestampAdapter"}
+  @python.Adapter{
+    name = "project.adapters.TimestampAdapter",
+    typeHint = "datetime.datetime",
+  }
+  1: i64 timestamp;
+}
+```
+
+The installed OSS compiler embeds this tree, so these includes resolve without
+an implicit source checkout. A file found through `-I` overrides the embedded
+copy. This keeps compiler and standard annotations version-matched while still
+supporting source-tree development.
+
+`scope.thrift` is for annotation-library authors: it declares which IDL nodes
+may carry another structured annotation. `thrift.thrift` is language-neutral;
+`cpp.thrift` and `python.thrift` affect their corresponding backends.
+`compat.thrift` supports legacy migrations, while `internal.thrift` is not a
+public application annotation API.
+
+See [standard IDL libraries](../features/standard-idl-libraries.md) for runtime
+schemas under `thrift/lib/thrift`, Any/Patch usage, and CMake integration.
 
 ### Scope Annotations
 
@@ -229,13 +261,11 @@ This is a structure size optimization. The naive implementation of `get_allocato
 
 </details>
 
-<FbInternalOnly>
-
 See [Adapters](/features/adapters.md) for more detail about `@python.Adapter`.
 
 ### Rust annotations
 
-See their [list of annotations](https://www.internalfb.com/intern/wiki/Rust-at-facebook/Thrift/IDL_Annotations/).
+Rust annotations are defined in `thrift/annotation/rust.thrift`.
 
 ### Go annotations
 
@@ -247,13 +277,13 @@ See their [list of annotations](https://www.internalfb.com/intern/wiki/Rust-at-f
 
 </details>
 
-</FbInternalOnly>
-
 ## Consumption in languages
 
 ### C++
 
-Structured annotations are accessible in C++ via the [Thrift/Metadata](/docs/fb/features/metadata/) API and the [`get_field_metadata`](https://github.com/facebook/fbthrift/tree/main/thrift/test/AnnotationTest.cpp?lines=35&commit=d2b5628782ed932c18d608a16cf4ba6c2ea663b3) API.
+Structured annotations are accessible through generated metadata and the
+`get_field_metadata` C++ API. Codegen with `no_metadata` deliberately omits the
+module metadata translation unit.
 
 ### Hack
 
@@ -267,7 +297,9 @@ Constants include annotations just for themselves. The getter method is defined 
 
 ### Python
 
-Structured annotations are accessible in Python via the [metadata API](https://www.internalfb.com/intern/wiki/Thrift_in_Python/User_Guide/Advanced_Usage/Metadata/). They are accessible on all objects which have metadata, which is structs, exceptions, unions, fields, services, and enums.
+Structured annotations are accessible through generated Python metadata for
+structs, exceptions, unions, fields, services, and enums. The modern `python`
+generator's `no_metadata` option deliberately omits that module.
 
 You can view an example for how to use these [here](https://github.com/facebook/fbthrift/tree/main/thrift/lib/py3/test/metadata.py?commit=80443af2713dbfa63ccd487d6d5f7d0850b2f022&lines=192).
 

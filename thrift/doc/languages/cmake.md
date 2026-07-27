@@ -78,6 +78,22 @@ fbthrift, so the normal `mcrouter -> fbthrift` dependency remains acyclic. See
 the [benchmark README](../../lib/cpp2/protocol/benchmark/README.md) for the
 code-generation boundary and supported Carbon IDL subset.
 
+Go validation is also opt-in so an ordinary C++ configuration does not add Go
+code generation or test processes to the default graph:
+
+```bash
+cmake -S . -B _build -G Ninja -DTHRIFT_GO=ON
+cmake --build _build --target thrift-go-check
+cmake --build _build --target thrift-go-stress \
+  -- -v
+```
+
+`thrift-go-check` runs the runtime smoke tests, generated fixtures, and builds
+the Go conformance executables. Stress is a separate target; bound it at
+configure time with `-DTHRIFT_GO_STRESS_REQUESTS=1000`. These targets use a
+disposable two-module Go workspace and do not install Go packages or add Go
+targets to `ALL`. See [Go code generation and runtime](go.md).
+
 ## Find the installed package
 
 ```cmake
@@ -230,6 +246,7 @@ OSS references are:
 
 - [Complete compiler generator catalog](generators.md)
 - [C++ code generation options](cpp/code-generation.md)
+- [Go code generation, modules, runtime, and validation](go.md)
 - [Java code generation and Maven build](java.md)
 - [Python code generation options](python.md)
 

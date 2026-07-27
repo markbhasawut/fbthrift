@@ -22,6 +22,7 @@ import (
 	"net"
 	"os"
 	"runtime"
+	"strconv"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -45,7 +46,14 @@ func TestServerStress(t *testing.T) {
 }
 
 func runStressTest(t *testing.T, serverTransport thrift.TransportID) {
-	listener, err := net.Listen("unix", fmt.Sprintf("/tmp/thrift_go_stress_server_test_%d.sock", os.Getpid()))
+	socketPath := fmt.Sprintf(
+		"%s/fbthrift_go_stress_%d_%d.sock",
+		os.TempDir(),
+		os.Getpid(),
+		time.Now().UnixNano(),
+	)
+	t.Cleanup(func() { _ = os.Remove(socketPath) })
+	listener, err := net.Listen("unix", socketPath)
 	require.NoError(t, err)
 	addr := listener.Addr()
 	t.Logf("Server listening on %v", addr)
@@ -78,6 +86,13 @@ func runStressTest(t *testing.T, serverTransport thrift.TransportID) {
 	var serverEG errgroup.Group
 	serverEG.Go(func() error {
 		return server.ServeContext(serverCtx)
+	})
+	serverStopped := false
+	t.Cleanup(func() {
+		if !serverStopped {
+			serverCancel()
+			_ = serverEG.Wait()
+		}
 	})
 
 	var successRequestCount atomic.Uint64
@@ -114,7 +129,13 @@ func runStressTest(t *testing.T, serverTransport thrift.TransportID) {
 	fdCountBefore, err := getNumFileDesciptors()
 	require.NoError(t, err)
 
-	const requestCount = 100_000
+	requestCount := 100_000
+	if configured := os.Getenv("FBTHRIFT_GO_STRESS_REQUESTS"); configured != "" {
+		parsed, err := strconv.Atoi(configured)
+		require.NoError(t, err)
+		require.Positive(t, parsed)
+		requestCount = parsed
+	}
 	const parallelism = 100
 
 	var clientsEG errgroup.Group
@@ -125,20 +146,30 @@ func runStressTest(t *testing.T, serverTransport thrift.TransportID) {
 	}
 	err = clientsEG.Wait()
 	timeElapsed := time.Since(startTime)
-	timePerRequest := timeElapsed / requestCount
+	timePerRequest := timeElapsed / time.Duration(requestCount)
 	t.Logf("successful requests: %d/%d", successRequestCount.Load(), requestCount)
 	require.NoError(t, err)
 
-	goroutinesAfterRequests := runtime.NumGoroutine()
+	// Closing a Rocket client starts asynchronous connection teardown. Wait for
+	// it to quiesce before evaluating leak thresholds; sampling immediately here
+	// measures expected teardown work rather than retained resources.
+	var fdCountAfter int
+	require.Eventually(t, func() bool {
+		count, err := getNumFileDesciptors()
+		if err != nil {
+			return false
+		}
+		fdCountAfter = count
+		return runtime.NumGoroutine() < 100 && fdCountAfter <= fdCountBefore
+	}, 10*time.Second, 10*time.Millisecond)
+
 	var memStatsAfter runtime.MemStats
 	runtime.GC()
 	runtime.ReadMemStats(&memStatsAfter)
-	fdCountAfter, err := getNumFileDesciptors()
-	require.NoError(t, err)
 
 	// Go routine check (while server is still running)
 	// We shouldn't exceed 100 Go-routines, if we do - server is likely leaking.
-	require.Less(t, goroutinesAfterRequests, 100)
+	require.Less(t, runtime.NumGoroutine(), 100)
 
 	// Mem alloc check (while server is still running)
 	require.Less(t, memStatsAfter.HeapAlloc, uint64(50*1024*1024) /* 50MB */)
@@ -152,15 +183,14 @@ func runStressTest(t *testing.T, serverTransport thrift.TransportID) {
 	// Shut down server.
 	serverCancel()
 	err = serverEG.Wait()
+	serverStopped = true
 	require.ErrorIs(t, err, context.Canceled)
-
-	// A tiny sleep to allow for some lingering goroutines to finish up.
-	time.Sleep(10 * time.Millisecond)
 
 	// Go routine check (after server shutdown)
 	// We shouldn't exceed 10 Go-routines, if we do - something didn't get cleaned up properly.
-	goroutinesAfterServerStop := runtime.NumGoroutine()
-	require.LessOrEqual(t, goroutinesAfterServerStop, 10)
+	require.Eventually(t, func() bool {
+		return runtime.NumGoroutine() <= 10
+	}, 10*time.Second, 10*time.Millisecond)
 }
 
 func getNumFileDesciptors() (int, error) {

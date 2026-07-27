@@ -71,7 +71,7 @@ func main() {
 	go func() {
 		err := server.ServeContext(ctx)
 		if err != nil {
-			glog.Fatalf("failed to start server")
+			glog.Fatalf("failed to start server: %v", err)
 		}
 	}()
 	fmt.Println(addr.(*net.TCPAddr).Port)

@@ -84,6 +84,9 @@ option(THRIFT_LIB_ONLY "Build the Thrift libraries only" OFF)
 option(THRIFT_RPC "Build the RPC transport stack and its dependencies (fizz, wangle, mvfst). Disable for codegen + (de)serialization-only consumers." ON)
 option(THRIFT_HTTP2 "Build the legacy Proxygen-backed HTTP/2 transport." OFF)
 option(THRIFT_BENCHMARKS "Build the regular benchmark executables. Forced OFF when THRIFT_RPC=OFF because benchmarks link thriftcpp2." OFF)
+option(THRIFT_GO
+  "Expose opt-in Go runtime, fixture, conformance-build, and stress targets"
+  OFF)
 option(THRIFT_CARBON_PROTOCOL_BENCHMARK
   "Build the opt-in Thrift/Carbon/Protobuf protocol benchmark. Requires a mcrouter source checkout and Protobuf."
   OFF)

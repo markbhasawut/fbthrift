@@ -30,7 +30,7 @@ must declare the path form they actually invoke.
 | `cpp`, `cpp2` | `mstch_cpp2` | `gen-cpp2` or `gen-py3cpp` | Modern C++ types/RPC. See [C++ code generation](cpp/code-generation.md) for every option, file, link dependency, and static-initializer rule. |
 | `cpp2_patch` | same | `gen-patch` | C++ patch companion IDL and traits. Required `source_include=<include/path.thrift>`. This is normally orchestrated by the CMake `patch` marker. |
 | `csharp_EXPERIMENTAL` | same | `gen-csharp/<program>.cs` | Experimental C# data types/codecs; no RPC and no options. |
-| `go` | `mstch_go` | `gen-go` | Go types/RPC using `namespace go`. Options: `gen_metadata=true\|false` and `use_reflect_codec=true\|false`. |
+| `go` | `mstch_go` | `gen-go` | Go 1.26 types/RPC using `namespace go`. Options: `package_prefix=IMPORT_PATH`, `gen_metadata=true\|false`, and `use_reflect_codec=true\|false`. See [Go code generation and runtime](go.md). |
 | `hack` | same | `gen-hack` | Hack types/RPC. Active options are listed below. |
 | `java` | `mstch_java` | `gen-java` | Modern Reactive Java using `namespace java.swift`. See [Java code generation](java.md). |
 | `javadeprecated` | `java_deprecated` | `gen-javadeprecated` | Legacy synchronous Java using `namespace java`; no options. See [Java code generation](java.md). |
@@ -53,8 +53,10 @@ the same IDL would claim identical output files.
 ## Complete option-name inventory
 
 Detailed C++, Python, Java, Go, and Rust descriptions are embedded in
-`thrift1 --help`. This section records the cross-generator inventory and
-options on older generators whose help was historically incomplete.
+`thrift1 --help`. See [Go code generation and runtime](go.md) for Go option,
+module, protocol, and validation details. This section records the
+cross-generator inventory and options on older generators whose help was
+historically incomplete.
 
 ### Hack
 

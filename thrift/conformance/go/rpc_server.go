@@ -54,7 +54,7 @@ func main() {
 	go func() {
 		err := ts.ServeContext(ctx)
 		if err != nil {
-			glog.Fatalf("failed to start server")
+			glog.Fatalf("failed to start server: %v", err)
 		}
 	}()
 

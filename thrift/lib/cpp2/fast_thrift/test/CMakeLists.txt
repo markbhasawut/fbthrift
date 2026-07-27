@@ -117,3 +117,42 @@ target_link_libraries(FastThrift_TransportHandlerTest
     fmt::fmt
 )
 gtest_discover_tests(FastThrift_TransportHandlerTest)
+
+# Real FastThrift server/client lifecycle coverage.  Keep this as one focused
+# integration binary: PingRoundTrip destroys the Rocket client while the
+# server is still running, so the connection-closed callback must safely erase
+# the type-erased connection owner before server shutdown.
+set(FAST_THRIFT_SERVER_TEST_IF_DIR
+  "${CMAKE_SOURCE_DIR}/thrift/lib/cpp2/fast_thrift/thrift/test/if")
+set(FAST_THRIFT_SERVER_TEST_IF_BUILD_DIR
+  "${CMAKE_BINARY_DIR}/thrift/lib/cpp2/fast_thrift/thrift/test/if")
+
+thrift_library(
+  "FastThriftServer"
+  "FastThriftServer;FastThriftChannelServer"
+  "cpp2"
+  ""
+  "${FAST_THRIFT_SERVER_TEST_IF_DIR}"
+  "${FAST_THRIFT_SERVER_TEST_IF_BUILD_DIR}"
+  "thrift/lib/cpp2/fast_thrift/thrift/test/if"
+  NO_INSTALL
+)
+target_link_libraries(FastThriftServer-cpp2-obj
+  PRIVATE
+    thriftcpp2
+    Folly::folly
+)
+
+add_executable(FastThrift_FastThriftServerTest
+  ../thrift/server/test/FastThriftServerTest.cpp
+)
+target_link_libraries(FastThrift_FastThriftServerTest
+  PRIVATE
+    FastThriftServer-cpp2
+    GTest::gmock
+    GTest::gtest_main
+    thriftcpp2
+    Folly::folly
+    fmt::fmt
+)
+gtest_discover_tests(FastThrift_FastThriftServerTest)

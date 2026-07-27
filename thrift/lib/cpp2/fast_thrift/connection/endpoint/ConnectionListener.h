@@ -17,6 +17,7 @@
 #pragma once
 
 #include <cstdint>
+#include <exception>
 #include <memory>
 
 #include <folly/ExceptionWrapper.h>
@@ -99,7 +100,13 @@ class ConnectionListener : public folly::DelayedDestruction,
     if (enableReusePortBpfSpread_) {
       attachReusePortBpfSpread();
     }
-    socket_->addAcceptCallback(this, evb_);
+    // This listener and its AsyncServerSocket share the same primary
+    // EventBase. Passing that EventBase explicitly would make Folly create a
+    // RemoteAcceptor for a callback that is not remote; besides adding a queue
+    // hop to every accept, immediate shutdown can race that bridge's startup.
+    // nullptr is Folly's contract for dispatch on the primary EventBase.
+    socket_->addAcceptCallback(this, nullptr);
+    acceptCallbackRegistered_ = true;
     socket_->startAccepting();
   }
 
@@ -111,10 +118,23 @@ class ConnectionListener : public folly::DelayedDestruction,
   // we take a self-DestructorGuard; acceptStopped() releases it. Safe to
   // drop the owning unique_ptr right after stop() returns — destroy() on
   // a DD with outstanding guards defers real destruction.
-  void stop() {
+  void stop() noexcept {
+    if (!acceptCallbackRegistered_) {
+      return;
+    }
     stopGuard_ =
         std::make_unique<folly::DelayedDestruction::DestructorGuard>(this);
-    socket_->removeAcceptCallback(this, evb_);
+    try {
+      socket_->removeAcceptCallback(this, nullptr);
+    } catch (const std::exception& ex) {
+      // start() can fail after AsyncServerSocket has already discarded its
+      // callback. Destructors still call stop(), so never let best-effort
+      // cleanup replace the original startup exception with std::terminate.
+      XLOG(WARN) << "Accept callback was already removed during shutdown: "
+                 << ex.what();
+      acceptCallbackRegistered_ = false;
+      stopGuard_.reset();
+    }
     if (pipeline_) {
       pipeline_->deactivate();
     }
@@ -161,6 +181,7 @@ class ConnectionListener : public folly::DelayedDestruction,
 
   void acceptStopped() noexcept override {
     XLOG(DBG3) << "Accept stopped";
+    acceptCallbackRegistered_ = false;
     stopGuard_.reset();
   }
 
@@ -191,6 +212,7 @@ class ConnectionListener : public folly::DelayedDestruction,
   folly::AsyncServerSocket::UniquePtr socket_;
   channel_pipeline::PipelineImpl* pipeline_{nullptr};
   std::unique_ptr<folly::DelayedDestruction::DestructorGuard> pipelineGuard_;
+  bool acceptCallbackRegistered_{false};
   // Self-guard taken in stop(); released in acceptStopped(). Keeps `this`
   // alive across the queued loop callback that removeAcceptCallback fires.
   std::unique_ptr<folly::DelayedDestruction::DestructorGuard> stopGuard_;

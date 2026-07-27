@@ -177,10 +177,17 @@ func readCodecSetSpec(d Decoder, dstValue reflect.Value, spec *CodecSetSpec) err
 		}
 	} else { // Unknown size
 		for {
-			elem := reflect.New(dstValue.Type().Elem())
-			err := ReadTypeSpec(d, elem.Elem(), spec.ElementTypeSpec)
+			hasNext, err := ReadContainerHasNext(d)
 			if err != nil {
+				return fmt.Errorf("error checking set element: %w", err)
+			}
+			if !hasNext {
 				break
+			}
+			elem := reflect.New(dstValue.Type().Elem())
+			err = ReadTypeSpec(d, elem.Elem(), spec.ElementTypeSpec)
+			if err != nil {
+				return err
 			}
 			dstSlice = reflect.Append(dstSlice, elem.Elem())
 		}
@@ -214,10 +221,17 @@ func readCodecListSpec(d Decoder, dstValue reflect.Value, spec *CodecListSpec) e
 		}
 	} else { // Unknown size
 		for {
-			elem := reflect.New(dstValue.Type().Elem())
-			err := ReadTypeSpec(d, elem.Elem(), spec.ElementTypeSpec)
+			hasNext, err := ReadContainerHasNext(d)
 			if err != nil {
+				return fmt.Errorf("error checking list element: %w", err)
+			}
+			if !hasNext {
 				break
+			}
+			elem := reflect.New(dstValue.Type().Elem())
+			err = ReadTypeSpec(d, elem.Elem(), spec.ElementTypeSpec)
+			if err != nil {
+				return err
 			}
 			dstSlice = reflect.Append(dstSlice, elem.Elem())
 		}
@@ -301,13 +315,20 @@ func readCodecMapSpec(d Decoder, dstValue reflect.Value, spec *CodecMapSpec) err
 		}
 	} else {
 		for {
+			hasNext, err := ReadContainerHasNext(d)
+			if err != nil {
+				return fmt.Errorf("error checking map entry: %w", err)
+			}
+			if !hasNext {
+				break
+			}
 			keyElem := reflect.New(passedKeyReflectType)
 			valueElem := reflect.New(valReflectType)
 
 			passedKeyReflectValue := keyElem.Elem()
-			err := ReadTypeSpec(d, passedKeyReflectValue, spec.KeyTypeSpec)
+			err = ReadTypeSpec(d, passedKeyReflectValue, spec.KeyTypeSpec)
 			if err != nil {
-				break
+				return err
 			}
 			valueReflectValue := valueElem.Elem()
 			err = ReadTypeSpec(d, valueReflectValue, spec.ValueTypeSpec)

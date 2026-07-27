@@ -313,6 +313,26 @@ std::string get_go_package_dir(const t_program* program) {
   return boost::replace_all_copy(go_package, ".", "/");
 }
 
+std::string qualify_go_import_path(
+    std::string import_path, std::string_view package_prefix) {
+  while (package_prefix.ends_with('/')) {
+    package_prefix.remove_suffix(1);
+  }
+  if (package_prefix.empty() || import_path.empty() ||
+      import_path == package_prefix ||
+      import_path.starts_with(fmt::format("{}/", package_prefix))) {
+    return import_path;
+  }
+
+  const auto first_separator = import_path.find('/');
+  const auto first_component = import_path.substr(0, first_separator);
+  if (first_component.find('.') != std::string::npos) {
+    // A domain-like first component is already a module-qualified path.
+    return import_path;
+  }
+  return fmt::format("{}/{}", package_prefix, import_path);
+}
+
 std::string get_go_package_base_name(const t_program* program) {
   auto go_package = get_go_package_name(program);
   std::vector<std::string> parts;

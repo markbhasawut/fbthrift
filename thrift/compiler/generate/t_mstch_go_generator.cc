@@ -28,10 +28,20 @@ namespace {
 
 constexpr generator_option_spec kGoGeneratorOptions[] = {
     {
+        "package_prefix",
+        "package_prefix=IMPORT_PATH",
+        generator_option_value_policy::required,
+        "Prefix namespace go import paths that are not already module-qualified. "
+        "For example, package_prefix=github.com/acme/project maps "
+        "thrift/example to github.com/acme/project/thrift/example. Package "
+        "declarations still use the namespace's final component.",
+        "",
+    },
+    {
         "gen_metadata",
         "gen_metadata=true|false",
         generator_option_value_policy::required,
-        "Emit metadata.go when true. The default is false.",
+        "Emit metadata.go when true. The default is true.",
         "",
     },
     {
@@ -71,6 +81,11 @@ class t_mstch_go_generator : public t_whisker_generator {
       const std::map<std::string, std::string>& options) final {
     t_whisker_generator::process_options(options);
     validate_generator_options("go", options, kGoGeneratorOptions);
+    if (const auto prefix = get_compiler_option("package_prefix");
+        prefix && (prefix->starts_with('/') || prefix->ends_with('/'))) {
+      throw std::runtime_error(
+          "Go generator option `package_prefix` must not start or end with '/'");
+    }
   }
 
   strictness_options strictness() const override {
@@ -88,12 +103,21 @@ class t_mstch_go_generator : public t_whisker_generator {
     if (auto use_reflect_codec = get_compiler_option("use_reflect_codec")) {
       data_.use_reflect_codec = (use_reflect_codec.value() == "true");
     }
+    if (auto package_prefix = get_compiler_option("package_prefix")) {
+      package_prefix_ = package_prefix.value();
+    }
 
     data_.set_current_program(program_);
     data_.register_visitors(visitor);
   }
 
   go::codegen_data data_;
+  std::string package_prefix_;
+
+  std::string go_import_path(const t_program& program) const {
+    return go::qualify_go_import_path(
+        go::get_go_package_dir(&program), package_prefix_);
+  }
 
   // Whisker prototype helpers
   std::string go_qualified_name(const t_named& self) const {
@@ -146,18 +170,18 @@ class t_mstch_go_generator : public t_whisker_generator {
     def.property("gen_metadata?", [this](const t_program&) {
       return data_.gen_metadata;
     });
-    def.property("go_import_path", [](const t_program& self) {
-      return go::get_go_package_dir(&self);
+    def.property("go_import_path", [this](const t_program& self) {
+      return go_import_path(self);
     });
-    def.property("import_metadata_package?", [](const t_program& self) {
+    def.property("import_metadata_package?", [this](const t_program& self) {
       // We don't need to import the metadata package if we are
       // generating metadata inside the metadata package itself. Duh.
-      return go::get_go_package_dir(&self) != go::THRIFT_METADATA_IMPORT;
+      return go_import_path(self) != go::THRIFT_METADATA_IMPORT;
     });
-    def.property("metadata_qualifier", [](const t_program& self) {
+    def.property("metadata_qualifier", [this](const t_program& self) {
       // We don't need to use "metadata." qualifier when generating
       // metadata inside the metadata package itself.
-      return go::get_go_package_dir(&self) == go::THRIFT_METADATA_IMPORT
+      return go_import_path(self) == go::THRIFT_METADATA_IMPORT
           ? whisker::make::string("")
           : whisker::make::string("metadata.");
     });

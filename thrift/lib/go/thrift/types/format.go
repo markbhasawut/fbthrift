@@ -94,6 +94,27 @@ type Decoder interface {
 	Skip(fieldType Type) (err error)
 }
 
+// UnknownSizeContainerDecoder is implemented by protocols whose container
+// encodings do not carry an element count. ReadContainerHasNext must be called
+// after a container begin method returns a negative size and before decoding
+// each element (or each map key/value pair).
+type UnknownSizeContainerDecoder interface {
+	ReadContainerHasNext() (bool, error)
+}
+
+// ReadContainerHasNext reports whether an unknown-size container has another
+// element without consuming it.
+func ReadContainerHasNext(decoder Decoder) (bool, error) {
+	containerDecoder, ok := decoder.(UnknownSizeContainerDecoder)
+	if !ok {
+		return false, NewProtocolExceptionWithType(
+			NOT_IMPLEMENTED,
+			errors.New("decoder returned an unknown container size without implementing UnknownSizeContainerDecoder"),
+		)
+	}
+	return containerDecoder.ReadContainerHasNext()
+}
+
 // Encoder is the interface that must be implemented by all serialization formats.
 type Encoder interface {
 	WriteMessageBegin(name string, typeID MessageType, seqid int32) error

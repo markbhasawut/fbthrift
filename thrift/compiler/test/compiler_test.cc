@@ -1540,7 +1540,7 @@ TEST(CompilerTest, oss_generator_aliases_and_option_validation) {
     namespace go example.test
     struct Foo { 1: i32 field }
 )",
-      {"--gen", "go:gen_metadata=true"});
+      {"--gen", "go"});
 
   check_compile(
       R"(

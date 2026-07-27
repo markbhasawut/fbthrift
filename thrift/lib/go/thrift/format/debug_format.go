@@ -200,6 +200,11 @@ func (tdp *debugFormat) ReadSetEnd() error {
 	log.Printf("%sReadSetEnd() err=%#v", tdp.LogPrefix, err)
 	return err
 }
+func (tdp *debugFormat) ReadContainerHasNext() (bool, error) {
+	hasNext, err := types.ReadContainerHasNext(tdp.Delegate)
+	log.Printf("%sReadContainerHasNext() (hasNext=%#v, err=%#v)", tdp.LogPrefix, hasNext, err)
+	return hasNext, err
+}
 func (tdp *debugFormat) ReadBool() (bool, error) {
 	value, err := tdp.Delegate.ReadBool()
 	log.Printf("%sReadBool() (value=%#v, err=%#v)", tdp.LogPrefix, value, err)

@@ -830,6 +830,9 @@ func TestSimpleJSONV2ReadEmptyContainers(t *testing.T) {
 		p := newSimpleJSONFormatV2(trans)
 		_, _, err := p.ReadListBegin()
 		require.NoError(t, err)
+		hasNext, err := p.ReadContainerHasNext()
+		require.NoError(t, err)
+		require.False(t, hasNext)
 		require.NoError(t, p.ReadListEnd())
 	})
 	t.Run("set", func(t *testing.T) {
@@ -837,6 +840,9 @@ func TestSimpleJSONV2ReadEmptyContainers(t *testing.T) {
 		p := newSimpleJSONFormatV2(trans)
 		_, _, err := p.ReadSetBegin()
 		require.NoError(t, err)
+		hasNext, err := p.ReadContainerHasNext()
+		require.NoError(t, err)
+		require.False(t, hasNext)
 		require.NoError(t, p.ReadSetEnd())
 	})
 	t.Run("struct-with-empty-list-field", func(t *testing.T) {
@@ -854,5 +860,61 @@ func TestSimpleJSONV2ReadEmptyContainers(t *testing.T) {
 		require.NoError(t, p.ReadListEnd())
 		require.NoError(t, p.ReadFieldEnd())
 		require.NoError(t, p.ReadStructEnd())
+	})
+}
+
+func TestSimpleJSONV2UnknownSizeContainerIteration(t *testing.T) {
+	t.Run("list", func(t *testing.T) {
+		p := newSimpleJSONFormatV2(bytes.NewBufferString("[1, 2]"))
+		_, size, err := p.ReadListBegin()
+		require.NoError(t, err)
+		require.Equal(t, -1, size)
+
+		for _, expected := range []int32{1, 2} {
+			hasNext, err := p.ReadContainerHasNext()
+			require.NoError(t, err)
+			require.True(t, hasNext)
+			actual, err := p.ReadI32()
+			require.NoError(t, err)
+			require.Equal(t, expected, actual)
+		}
+		hasNext, err := p.ReadContainerHasNext()
+		require.NoError(t, err)
+		require.False(t, hasNext)
+		require.NoError(t, p.ReadListEnd())
+	})
+
+	t.Run("map", func(t *testing.T) {
+		p := newSimpleJSONFormatV2(bytes.NewBufferString(`{"one": 1}`))
+		_, _, size, err := p.ReadMapBegin()
+		require.NoError(t, err)
+		require.Equal(t, -1, size)
+
+		hasNext, err := p.ReadContainerHasNext()
+		require.NoError(t, err)
+		require.True(t, hasNext)
+		key, err := p.ReadString()
+		require.NoError(t, err)
+		require.Equal(t, "one", key)
+		value, err := p.ReadI32()
+		require.NoError(t, err)
+		require.Equal(t, int32(1), value)
+		hasNext, err = p.ReadContainerHasNext()
+		require.NoError(t, err)
+		require.False(t, hasNext)
+		require.NoError(t, p.ReadMapEnd())
+	})
+
+	t.Run("reject missing separator", func(t *testing.T) {
+		p := newSimpleJSONFormatV2(bytes.NewBufferString("[1 2]"))
+		_, _, err := p.ReadListBegin()
+		require.NoError(t, err)
+		hasNext, err := p.ReadContainerHasNext()
+		require.NoError(t, err)
+		require.True(t, hasNext)
+		_, err = p.ReadI32()
+		require.NoError(t, err)
+		_, err = p.ReadContainerHasNext()
+		require.ErrorContains(t, err, "expected a container separator or end")
 	})
 }

@@ -125,6 +125,7 @@ type simpleJSONFormat struct {
 }
 
 var _ types.Format = (*simpleJSONFormat)(nil)
+var _ types.UnknownSizeContainerDecoder = (*simpleJSONFormat)(nil)
 
 // NewSimpleJSONFormat creates a new simpleJSONFormat
 func NewSimpleJSONFormat(readWriter io.ReadWriter) types.Format {
@@ -452,6 +453,60 @@ func (p *simpleJSONFormat) ReadSetBegin() (types.Type /* elemType */, int /* siz
 
 func (p *simpleJSONFormat) ReadSetEnd() error {
 	return p.ParseListEnd()
+}
+
+// ReadContainerHasNext reports whether the current V2 container has another
+// element. V2 omits container sizes, so generated and reflection codecs call
+// this method before decoding each list/set element or map key/value pair.
+func (p *simpleJSONFormat) ReadContainerHasNext() (bool, error) {
+	if !p.containerBugFix {
+		return false, types.NewProtocolExceptionWithType(
+			types.NOT_IMPLEMENTED,
+			errors.New("unknown-size containers are only supported by SimpleJSON V2"),
+		)
+	}
+	if err := p.readNonSignificantWhitespace(); err != nil {
+		return false, types.NewProtocolException(err)
+	}
+
+	context, ok := p.parseContextStack.peek()
+	if !ok {
+		return false, errEmptyJSONContextStack
+	}
+	next, err := p.reader.Peek(1)
+	if err != nil {
+		return false, types.NewProtocolException(err)
+	}
+
+	switch context {
+	case _CONTEXT_IN_LIST_FIRST:
+		return next[0] != JSON_RBRACKET[0], nil
+	case _CONTEXT_IN_LIST:
+		switch next[0] {
+		case JSON_RBRACKET[0]:
+			return false, nil
+		case JSON_COMMA[0]:
+			return true, nil
+		}
+	case _CONTEXT_IN_OBJECT_FIRST:
+		return next[0] != JSON_RBRACE[0], nil
+	case _CONTEXT_IN_OBJECT_NEXT_KEY:
+		switch next[0] {
+		case JSON_RBRACE[0]:
+			return false, nil
+		case JSON_COMMA[0]:
+			return true, nil
+		}
+	}
+
+	return false, types.NewProtocolExceptionWithType(
+		types.INVALID_DATA,
+		fmt.Errorf(
+			"expected a container separator or end in %s context, found %q",
+			context,
+			next,
+		),
+	)
 }
 
 func (p *simpleJSONFormat) ReadBool() (bool, error) {

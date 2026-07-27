@@ -18,6 +18,7 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 
 #include <thrift/compiler/ast/ast_visitor.h>
 #include <thrift/compiler/ast/t_program.h>
@@ -149,6 +150,11 @@ extern const std::string THRIFT_METADATA_IMPORT;
 std::string get_go_package_name(const t_program* program);
 // e.g. very/good/package
 std::string get_go_package_dir(const t_program* program);
+// Prefixes an unqualified import path while preserving module-qualified paths.
+// e.g. (thrift/example, github.com/facebook/fbthrift) becomes
+// github.com/facebook/fbthrift/thrift/example.
+std::string qualify_go_import_path(
+    std::string import_path, std::string_view package_prefix);
 // e.g. package
 std::string get_go_package_base_name(const t_program* program);
 

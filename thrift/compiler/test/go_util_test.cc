@@ -68,3 +68,26 @@ TEST_F(GoUtilTest, test_munge_ident) {
   EXPECT_EQ(go::munge_ident("new_bar", true, true), "NewBar_");
   EXPECT_EQ(go::munge_ident("NewBar", true, true), "NewBar_");
 }
+
+TEST_F(GoUtilTest, QualifyGoImportPath) {
+  EXPECT_EQ(
+      go::qualify_go_import_path(
+          "thrift/lib/thrift/any", "github.com/facebook/fbthrift"),
+      "github.com/facebook/fbthrift/thrift/lib/thrift/any");
+  EXPECT_EQ(
+      go::qualify_go_import_path(
+          "github.com/acme/types", "github.com/facebook/fbthrift"),
+      "github.com/acme/types");
+  EXPECT_EQ(
+      go::qualify_go_import_path(
+          "github.com/facebook/fbthrift/thrift/example",
+          "github.com/facebook/fbthrift"),
+      "github.com/facebook/fbthrift/thrift/example");
+  EXPECT_EQ(
+      go::qualify_go_import_path("thrift/example", ""),
+      "thrift/example");
+}
+
+TEST_F(GoUtilTest, MetadataGenerationDefaultsToEnabled) {
+  EXPECT_TRUE(go::codegen_data{}.gen_metadata);
+}

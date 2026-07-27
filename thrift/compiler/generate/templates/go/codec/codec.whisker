@@ -112,8 +112,21 @@ if err != nil {
     return fmt.Errorf("error reading list begin: %w", err)
 }
 
-listResult := make({{#partial types.go_type type=type}}, 0, size)
-for i := 0; i < size; i++ {
+listCapacity := size
+if listCapacity < 0 {
+    listCapacity = 0
+}
+listResult := make({{#partial types.go_type type=type}}, 0, listCapacity)
+for i := 0; size < 0 || i < size; i++ {
+    if size < 0 {
+        hasNext, err := thrift.ReadContainerHasNext(p)
+        if err != nil {
+            return fmt.Errorf("error checking list element: %w", err)
+        }
+        if !hasNext {
+            break
+        }
+    }
     var elem {{#if type.elem_type.structured?}}*{{/if type.elem_type.structured?}}{{#partial types.go_type type=type.elem_type}}
     {{! Use scope to avoid multiple 'result' variable collisions }}
     {
@@ -134,8 +147,21 @@ if err != nil {
     return fmt.Errorf("error reading set begin: %w", err)
 }
 
-setResult := make({{#partial types.go_type type=type}}, 0, size)
-for i := 0; i < size; i++ {
+setCapacity := size
+if setCapacity < 0 {
+    setCapacity = 0
+}
+setResult := make({{#partial types.go_type type=type}}, 0, setCapacity)
+for i := 0; size < 0 || i < size; i++ {
+    if size < 0 {
+        hasNext, err := thrift.ReadContainerHasNext(p)
+        if err != nil {
+            return fmt.Errorf("error checking set element: %w", err)
+        }
+        if !hasNext {
+            break
+        }
+    }
     var elem {{#if type.elem_type.structured?}}*{{/if type.elem_type.structured?}}{{#partial types.go_type type=type.elem_type}}
     {{! Use scope to avoid multiple 'result' variable collisions }}
     {
@@ -156,8 +182,21 @@ if err != nil {
     return fmt.Errorf("error reading map begin: %w", err)
 }
 
-mapResult := make({{#partial types.go_type type=type}}, size)
-for i := 0; i < size; i++ {
+mapCapacity := size
+if mapCapacity < 0 {
+    mapCapacity = 0
+}
+mapResult := make({{#partial types.go_type type=type}}, mapCapacity)
+for i := 0; size < 0 || i < size; i++ {
+    if size < 0 {
+        hasNext, err := thrift.ReadContainerHasNext(p)
+        if err != nil {
+            return fmt.Errorf("error checking map entry: %w", err)
+        }
+        if !hasNext {
+            break
+        }
+    }
     {{! Use scopes to avoid multiple 'result' variable collisions }}
     var key {{#if (not type.key_type.go_comparable?)}}*{{/if (not type.key_type.go_comparable?)}}{{#partial types.go_type type=type.key_type}}
     {

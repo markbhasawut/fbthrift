@@ -129,9 +129,29 @@ void ConnectionHandler::closeAllConnectionsOnEvb() {
 }
 
 void ConnectionHandler::onConnectionClosed(uint64_t connId) noexcept {
-  if (connections_.erase(connId) > 0) {
-    connectionCount_.fetch_sub(1, std::memory_order_relaxed);
+  auto it = connections_.find(connId);
+  if (it == connections_.end()) {
+    // Connection teardown may surface the same terminal notification from
+    // more than one layer. In particular, destroying a tail adapter can fire
+    // its fallback close callback after the pipeline already reported
+    // ConnectionClosed. The first notification owns removal; later ones are
+    // idempotent no-ops.
+    return;
   }
+
+  // Move the connection out before erasing its F14 node. Destroying the
+  // mapped connection can synchronously re-enter this function through a
+  // destructor fallback. If erase() destroys the connection in-place, that
+  // nested erase mutates the same F14 item slot while the outer erase still
+  // holds a reference to it, corrupting the node pointer before deallocation.
+  // Erase the now-empty node first, then destroy the connection after the map
+  // no longer contains connId; a nested notification therefore takes the
+  // idempotent return above.
+  auto connection = std::move(it->second);
+  connections_.erase(it);
+  connectionCount_.fetch_sub(1, std::memory_order_relaxed);
+  connection.conn.reset();
+
   if (draining_.load(std::memory_order_acquire) && connections_.empty()) {
     postDrainedOnce();
   }

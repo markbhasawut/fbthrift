@@ -49,6 +49,40 @@ struct TestConnection {
   std::function<void()> closeCb;
   bool closed{false};
   bool closeOnStart{false};
+  bool repeatCloseCallbackOnDestroy{false};
+
+  TestConnection() = default;
+  TestConnection(TestConnection&& other) noexcept
+      : transport(std::move(other.transport)),
+        closeCount(std::move(other.closeCount)),
+        closeCb(std::move(other.closeCb)),
+        closed(other.closed),
+        closeOnStart(other.closeOnStart),
+        repeatCloseCallbackOnDestroy(other.repeatCloseCallbackOnDestroy) {
+    other.repeatCloseCallbackOnDestroy = false;
+  }
+  TestConnection& operator=(TestConnection&& other) noexcept {
+    if (this == &other) {
+      return *this;
+    }
+    transport = std::move(other.transport);
+    closeCount = std::move(other.closeCount);
+    closeCb = std::move(other.closeCb);
+    closed = other.closed;
+    closeOnStart = other.closeOnStart;
+    repeatCloseCallbackOnDestroy = other.repeatCloseCallbackOnDestroy;
+    other.repeatCloseCallbackOnDestroy = false;
+    return *this;
+  }
+  TestConnection(const TestConnection&) = delete;
+  TestConnection& operator=(const TestConnection&) = delete;
+
+  ~TestConnection() {
+    if (repeatCloseCallbackOnDestroy && closeCb) {
+      auto cb = std::move(closeCb);
+      cb();
+    }
+  }
 
   void setCloseCallback(std::function<void()> cb) { closeCb = std::move(cb); }
 
@@ -72,7 +106,10 @@ struct TestConnection {
       closeCount->fetch_add(1, std::memory_order_relaxed);
     }
     if (closeCb) {
-      auto cb = std::move(closeCb);
+      // Keep a copy installed for the destructor when requested. This models
+      // independent terminal notifications from the pipeline and adapter
+      // fallback paths, both of which identify the same connection.
+      auto cb = repeatCloseCallbackOnDestroy ? closeCb : std::move(closeCb);
       cb();
     }
   }
@@ -83,20 +120,26 @@ class TestConnectionFactory {
  public:
   explicit TestConnectionFactory(
       std::shared_ptr<std::atomic<size_t>> closeCount = nullptr,
-      bool closeOnStart = false) noexcept
-      : closeCount_(std::move(closeCount)), closeOnStart_(closeOnStart) {}
+      bool closeOnStart = false,
+      bool repeatCloseCallbackOnDestroy = false) noexcept
+      : closeCount_(std::move(closeCount)),
+        closeOnStart_(closeOnStart),
+        repeatCloseCallbackOnDestroy_(repeatCloseCallbackOnDestroy) {}
 
   TestConnection getConnection(folly::AsyncTransport::UniquePtr socket) {
-    return TestConnection{
-        .transport = std::move(socket),
-        .closeCount = closeCount_,
-        .closeCb = {},
-        .closeOnStart = closeOnStart_};
+    TestConnection connection;
+    connection.transport = std::move(socket);
+    connection.closeCount = closeCount_;
+    connection.closeOnStart = closeOnStart_;
+    connection.repeatCloseCallbackOnDestroy =
+        repeatCloseCallbackOnDestroy_;
+    return connection;
   }
 
  private:
   std::shared_ptr<std::atomic<size_t>> closeCount_;
   bool closeOnStart_;
+  bool repeatCloseCallbackOnDestroy_;
 };
 
 } // namespace
@@ -257,6 +300,29 @@ TEST_F(ConnectionHandlerTest, StopDrainsAllConnections) {
 
   EXPECT_EQ(handler->connectionCount(), 0);
   EXPECT_EQ(closeCount_->load(), 3);
+}
+
+// Regression: a connection can report terminal state through its pipeline
+// and repeat that notification from an adapter destructor fallback. The map
+// entry must be removed before destroying the mapped connection; otherwise
+// the destructor re-enters erase() for the same F14 node and corrupts the
+// node pointer while the outer erase still owns it.
+TEST_F(ConnectionHandlerTest, RepeatedCloseDuringDestructionIsIdempotent) {
+  auto handler = createConnectionHandler();
+  factory_ = std::make_unique<TestConnectionFactory>(
+      closeCount_,
+      /*closeOnStart=*/false,
+      /*repeatCloseCallbackOnDestroy=*/true);
+  evb_->runInEventBaseThreadAndWait(
+      [&] { handler->setConnectionFactory(*factory_); });
+
+  connectAndWait(*handler, handler->getAddress());
+  ASSERT_EQ(handler->connectionCount(), 1);
+
+  handler->stop();
+
+  EXPECT_EQ(handler->connectionCount(), 0);
+  EXPECT_EQ(closeCount_->load(), 1);
 }
 
 TEST_F(ConnectionHandlerTest, StopWithNoConnections) {

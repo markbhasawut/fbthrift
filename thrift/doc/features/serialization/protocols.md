@@ -767,6 +767,9 @@ A contiguous buffer means several advantages:
 
 This protocol prints the Thrift object as a human readable, nicely indented string. It is write only now, you cannot deserialize from such a string. There is no guarantee that the format won't change -- it might be evolved in a non-backward compatible way. It should only be used for logging.
 
+For `debugStringViaEncode()`, output limits, redaction risks, IOBuf costs, and
+LLDB usage, see [Debugging C++ FBThrift](../../languages/cpp/debugging.md).
+
 ## Deprecated
 
 - JSON: This protocol serializes Thrift objects into JSON objects.

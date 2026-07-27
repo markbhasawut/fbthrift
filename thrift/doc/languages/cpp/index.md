@@ -11,6 +11,8 @@ examples, see [Serialization protocols and runtime APIs](../../features/serializ
 For `RocketClientChannel`, Header, HTTP/2, QUIC, and the experimental
 `fast_thrift` stack, see
 [RPC transports and C++ runtime stacks](../../features/rpc-transports.md).
+For LLDB workflows, generated handlers, coroutine stacks, `IOBuf` inspection,
+and safe use of `DebugProtocolWriter`, see [Debugging C++ FBThrift](debugging.md).
 
 import DocCardList from '@theme/DocCardList';
 
